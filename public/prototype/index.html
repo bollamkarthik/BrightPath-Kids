@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BrightPath Kids</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section class="auth-screen" id="authScreen">
+      <div class="auth-hero">
+        <p class="eyebrow">Demo accounts</p>
+        <h1>BrightPath for kids and parents</h1>
+        <p>Parents can add up to two child profiles and review progress. Kids can sign in with their first and last name.</p>
+      </div>
+
+      <div class="auth-grid">
+        <form class="auth-card" id="parentLoginForm">
+          <span class="auth-badge">Parent</span>
+          <h2>Parent login</h2>
+          <label for="parentName">Name</label>
+          <input id="parentName" name="parentName" autocomplete="name" value="Karthik" />
+          <label for="parentEmail">Email</label>
+          <input id="parentEmail" name="parentEmail" autocomplete="email" value="parent@example.com" />
+          <label for="parentPassword">Password</label>
+          <input id="parentPassword" name="parentPassword" type="password" autocomplete="current-password" value="demo123" />
+          <button type="submit">Enter parent dashboard</button>
+          <p class="helper-text">New parent email creates a parent profile. Demo only; this saves to this browser.</p>
+        </form>
+
+        <form class="auth-card" id="kidLoginForm">
+          <span class="auth-badge kid">Kid</span>
+          <h2>Kid login</h2>
+          <label for="kidFirstName">First name</label>
+          <input id="kidFirstName" name="kidFirstName" autocomplete="given-name" value="Avery" />
+          <label for="kidLastName">Last name</label>
+          <input id="kidLastName" name="kidLastName" autocomplete="family-name" value="Stone" />
+          <button type="submit">Start learning</button>
+          <p class="helper-text">Try <strong>Avery Stone</strong>, or use the name saved by the parent.</p>
+        </form>
+
+        <details class="auth-card organizer-card">
+          <summary>
+            <span class="auth-badge academy">Academy</span>
+            <strong>If you are the organizer, click here to login.</strong>
+          </summary>
+          <form class="organizer-form" id="academyLoginForm">
+            <label for="academyCode">Academy code</label>
+            <input id="academyCode" name="academyCode" autocomplete="off" value="ACADEMY" />
+            <button type="submit">Open master dashboard</button>
+            <p class="helper-text">Demo owner code: <strong>ACADEMY</strong></p>
+          </form>
+        </details>
+      </div>
+
+      <p class="auth-message" id="authMessage" role="status"></p>
+    </section>
+
+    <div class="app-shell hidden" id="appShell">
+      <main class="main" id="top">
+        <header class="topbar">
+          <a class="brand topbar-brand" href="#" aria-label="BrightPath Kids home">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 48 48" role="img">
+                <path d="M24 4 43 15v18L24 44 5 33V15L24 4Z" fill="#ffca3a" />
+                <path d="M24 11 36 18v12l-12 7-12-7V18l12-7Z" fill="#fff4bd" />
+                <path d="M18 24h12M24 18v12" stroke="#2f327d" stroke-width="4" stroke-linecap="round" />
+              </svg>
+            </span>
+            <span>
+              <strong>BrightPath</strong>
+              <small>English + Math</small>
+            </span>
+          </a>
+          <div>
+            <p class="eyebrow" id="appEyebrow">Daily learning path</p>
+            <h1 id="appTitle">Practice that grows with every learner</h1>
+          </div>
+          <div class="profile-pill" aria-label="Active profile">
+            <span class="avatar" id="profileAvatar">A</span>
+            <span>
+              <strong id="profileName">Avery</strong>
+              <small id="profileMeta">12 day streak</small>
+            </span>
+            <button class="logout-button" id="logoutButton" type="button">Log out</button>
+          </div>
+        </header>
+
+        <section class="controls-band learner-only" aria-label="Practice setup">
+          <div class="age-display">
+            <label>Level</label>
+            <strong id="ageGroupLabel">Level 2 (ages 7-10)</strong>
+          </div>
+
+          <div class="placement-display">
+            <label>Placement</label>
+            <strong id="placementResultLabel">Not checked</strong>
+          </div>
+
+          <div class="subject-toggle" role="group" aria-label="Subject">
+            <button class="subject-button active" type="button" data-subject="math">Math</button>
+            <button class="subject-button" type="button" data-subject="english">English</button>
+          </div>
+
+          <div>
+            <label for="topicSelect">Topic</label>
+            <select id="topicSelect"></select>
+          </div>
+
+        </section>
+
+        <section class="parent-dashboard hidden" id="parentDashboard">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Student dashboard</p>
+              <h2>Check student work</h2>
+            </div>
+          </div>
+
+          <section class="academy-summary hidden" id="academySummary" aria-label="Academy summary"></section>
+
+          <section class="parent-child-manager hidden" id="parentChildManager" aria-label="Create child profile">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Child profiles</p>
+                <h2>Add a child</h2>
+              </div>
+              <span class="helper-text" id="parentChildLimitNote">0 of 2 profiles used</span>
+            </div>
+            <form class="add-child-form" id="parentChildForm">
+              <div>
+                <label for="parentChildFirstName">First name</label>
+                <input id="parentChildFirstName" name="parentChildFirstName" autocomplete="given-name" placeholder="Example: Leo" />
+              </div>
+              <div>
+                <label for="parentChildLastName">Last name</label>
+                <input id="parentChildLastName" name="parentChildLastName" autocomplete="family-name" placeholder="Example: Patel" />
+              </div>
+              <div>
+                <label for="parentChildAge">Starting level</label>
+                <select id="parentChildAge" name="parentChildAge">
+                  <option value="5">Level 1 (ages 4-6)</option>
+                  <option value="8" selected>Level 2 (ages 7-10)</option>
+                  <option value="12">Level 3 (ages 11-13)</option>
+                  <option value="15">Level 4 (ages 14+)</option>
+                </select>
+              </div>
+              <div>
+                <label for="parentChildState">State</label>
+                <select id="parentChildState" name="parentChildState"></select>
+              </div>
+              <button type="submit">Create child profile</button>
+            </form>
+          </section>
+
+          <section class="academy-management hidden" id="academyManagement" aria-label="Academy roster management">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Roster cleanup</p>
+                <h2>Delete profiles</h2>
+              </div>
+            </div>
+
+            <div class="roster-grid">
+              <section class="roster-card">
+                <h3>Parents</h3>
+                <div class="roster-list" id="parentRoster"></div>
+              </section>
+              <section class="roster-card">
+                <h3>Students</h3>
+                <div class="roster-list" id="childRoster"></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="work-review hidden" id="workReview" aria-label="Student work review"></section>
+
+          <section class="ranking-section" aria-label="Level ranking">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Rankings</p>
+                <h2>Level leaderboard</h2>
+              </div>
+            </div>
+            <div class="ranking-grid" id="rankingGrid"></div>
+            <div class="section-heading compact-heading">
+              <div>
+                <p class="eyebrow">State</p>
+                <h2>State leaderboard</h2>
+              </div>
+            </div>
+            <div class="ranking-grid" id="stateRankingGrid"></div>
+          </section>
+
+          <div class="report-grid" id="parentReport"></div>
+        </section>
+
+        <section class="practice-layout learner-only" id="practice">
+          <article class="activity-card" aria-live="polite">
+            <div class="card-heading">
+              <div>
+                <p class="eyebrow">Practice round</p>
+                <h2 id="questionTitle">Solve the pattern</h2>
+              </div>
+              <span class="level-chip" id="levelChip">Level 2</span>
+            </div>
+
+            <div class="question-box">
+              <p id="questionPrompt">What number comes next?</p>
+              <strong id="questionText">6, 12, 18, 24, ?</strong>
+            </div>
+
+            <form id="answerForm" class="answer-form">
+              <label for="answerInput">Your answer</label>
+              <div class="answer-row">
+                <input id="answerInput" name="answer" autocomplete="off" />
+                <button type="submit">Check</button>
+              </div>
+            </form>
+
+            <p id="feedback" class="feedback" role="status">Try it when you're ready.</p>
+
+            <div class="activity-actions">
+              <button id="hintButton" class="ghost-button" type="button">Hint</button>
+              <button id="nextButton" class="ghost-button" type="button">Next</button>
+            </div>
+          </article>
+        </section>
+
+      </main>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
