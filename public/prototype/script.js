@@ -857,7 +857,9 @@ async function loadDatabaseData() {
 async function loadAcademyData() {
   if (!hasDatabaseConnection()) return;
 
-  const { data, error } = await supabaseClient.rpc("academy_roster");
+  const { data, error } = await supabaseClient.rpc("academy_roster", {
+    request_token: "dashboard"
+  });
 
   if (error) {
     throw error;

@@ -261,10 +261,11 @@ grant execute on function public.student_portal_by_code(text, text, text) to ano
 grant execute on function public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, jsonb) to anon, authenticated;
 
 drop function if exists public.academy_roster(text);
+drop function if exists public.academy_roster();
 drop function if exists public.academy_delete_student(text, uuid);
 drop function if exists public.academy_delete_parent(text, uuid);
 
-create or replace function public.academy_roster()
+create or replace function public.academy_roster(request_token text)
 returns jsonb
 language plpgsql
 security definer
@@ -275,6 +276,10 @@ declare
   student_rows jsonb;
   attempt_rows jsonb;
 begin
+  if request_token <> 'dashboard' then
+    raise exception 'Invalid academy request.';
+  end if;
+
   if not public.is_academy_admin() then
     raise exception 'This account is not an academy admin.';
   end if;
@@ -335,7 +340,7 @@ begin
 end;
 $$;
 
-grant execute on function public.academy_roster() to authenticated;
+grant execute on function public.academy_roster(text) to authenticated;
 grant execute on function public.academy_delete_student(uuid) to authenticated;
 grant execute on function public.academy_delete_parent(uuid) to authenticated;
 
@@ -359,3 +364,5 @@ select
 from public.students
 left join public.attempts on attempts.child_id = students.id
 group by students.id, attempts.subject;
+
+notify pgrst, 'reload schema';

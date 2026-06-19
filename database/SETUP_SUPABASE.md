@@ -71,6 +71,7 @@ Upload these changed files to the same GitHub repo:
 Vercel will redeploy after GitHub updates.
 
 After uploading, rerun `database/schema.sql` in Supabase SQL Editor so the master dashboard can load and delete database records.
+The file ends with a schema refresh command so Supabase's API can see the updated admin functions.
 
 ## Important Security Note
 
