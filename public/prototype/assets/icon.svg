@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BrightPath Kids logo">
+  <defs>
+    <linearGradient id="sky" x1="76" x2="436" y1="58" y2="462" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5cc8ff"/>
+      <stop offset="1" stop-color="#5b6cff"/>
+    </linearGradient>
+    <linearGradient id="path" x1="155" x2="357" y1="150" y2="396" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff5c4"/>
+      <stop offset="1" stop-color="#ffd447"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <circle cx="395" cy="112" r="54" fill="#ffdd4a"/>
+  <path fill="#ffffff" d="M94 334c44-68 96-102 156-102s112 34 168 102v82H94v-82Z" opacity=".92"/>
+  <path fill="url(#path)" d="M256 116 389 197v126L256 404 123 323V197l133-81Z"/>
+  <path fill="#fff7cf" d="M256 166 340 217v80l-84 51-84-51v-80l84-51Z"/>
+  <path d="M213 258h86M256 215v86" stroke="#2f327d" stroke-width="34" stroke-linecap="round"/>
+  <circle cx="149" cy="144" r="22" fill="#ff6b6b"/>
+  <circle cx="99" cy="241" r="17" fill="#50d890"/>
+  <circle cx="413" cy="266" r="18" fill="#8e62dc"/>
+</svg>

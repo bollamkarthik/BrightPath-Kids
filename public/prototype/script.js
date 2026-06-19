@@ -727,6 +727,30 @@ function createDemoData() {
   };
 }
 
+function getDemoParent() {
+  return { id: "parent-demo", name: "Karthik", email: "parent@example.com", password: "demo123" };
+}
+
+function getDemoChildren() {
+  return [
+    { id: "child-avery", parentId: "parent-demo", firstName: "Avery", lastName: "Stone", name: "Avery Stone", age: 8, state: "CA", code: "AVERY123" },
+    { id: "child-maya", parentId: "parent-demo", firstName: "Maya", lastName: "Patel", name: "Maya Patel", age: 12, state: "TX", code: "MAYA456" }
+  ];
+}
+
+function ensureDemoAccounts() {
+  const demoParent = getDemoParent();
+  if (!demoData.parents.some((parent) => parent.id === demoParent.id)) {
+    demoData.parents.push(demoParent);
+  }
+
+  getDemoChildren().forEach((demoChild) => {
+    if (!demoData.children.some((child) => child.id === demoChild.id)) {
+      demoData.children.push(demoChild);
+    }
+  });
+}
+
 function readJson(key, fallback) {
   try {
     return JSON.parse(localStorage.getItem(key)) || fallback;
@@ -803,6 +827,10 @@ function normalizeChildCode(value) {
   return String(value || "").trim().toUpperCase();
 }
 
+function isDatabaseUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
 async function loadDatabaseData() {
   if (!hasDatabaseConnection()) return;
 
@@ -822,24 +850,83 @@ async function loadDatabaseData() {
     children: (children || []).map(mapChildFromRow),
     attempts: (attempts || []).map(mapAttemptFromRow)
   };
+  ensureDemoAccounts();
   saveDemoData();
 }
 
-async function signInOrCreateParent({ name, email, password }) {
+async function loadAcademyData() {
+  if (!hasDatabaseConnection()) return;
+
+  const { data, error } = await supabaseClient.rpc("academy_roster");
+
+  if (error) {
+    throw error;
+  }
+
+  demoData = {
+    parents: (data.parents || []).map(mapParentFromRow),
+    children: (data.students || []).map(mapChildFromRow),
+    attempts: (data.attempts || []).map(mapAttemptFromRow)
+  };
+  ensureDemoAccounts();
+  saveDemoData();
+}
+
+async function signInAcademyAdmin({ email, password }) {
   if (!hasDatabaseConnection()) {
-    let parent = demoData.parents.find((item) => item.email === email);
-
-    if (parent && parent.password !== password) {
-      throw new Error("That password does not match this demo parent account.");
+    if (email === "admin@brightpath.test" && password === "admin123") {
+      return { email };
     }
 
-    if (!parent) {
-      parent = { id: `parent-${Date.now()}`, name, email, password };
-      demoData.parents.push(parent);
-      saveDemoData();
-    }
+    throw new Error("Admin login needs Supabase connected. Demo fallback: admin@brightpath.test / admin123.");
+  }
 
-    return parent;
+  const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+  if (authError) {
+    throw authError;
+  }
+
+  const user = authData && authData.user;
+  if (!user) {
+    throw new Error("Admin account was not confirmed yet.");
+  }
+
+  const { data: adminRow, error: adminError } = await supabaseClient
+    .from("academy_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (adminError) {
+    throw adminError;
+  }
+
+  if (!adminRow) {
+    await supabaseClient.auth.signOut();
+    throw new Error("This account is not an academy admin yet.");
+  }
+
+  await loadAcademyData();
+  return { email, userId: user.id };
+}
+
+async function signInOrCreateParent({ name, email, password }) {
+  let localParent = demoData.parents.find((item) => item.email === email);
+
+  if (localParent && localParent.password && localParent.password !== password) {
+    throw new Error("That password does not match this parent account.");
+  }
+
+  if (localParent && localParent.password === password) {
+    return localParent;
+  }
+
+  if (!hasDatabaseConnection()) {
+    localParent = { id: `parent-${Date.now()}`, name, email, password };
+    demoData.parents.push(localParent);
+    saveDemoData();
+    return localParent;
   }
 
   let authResult = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -860,7 +947,10 @@ async function signInOrCreateParent({ name, email, password }) {
   const activeSession = authResult.data.session;
 
   if (!user || !activeSession) {
-    throw new Error("Check your email to confirm this parent account, then log in again.");
+    localParent = { id: `parent-${Date.now()}`, name, email, password, needsEmailConfirmation: true };
+    demoData.parents.push(localParent);
+    saveDemoData();
+    return localParent;
   }
 
   const { data: parentRow, error } = await supabaseClient
@@ -879,15 +969,14 @@ async function signInOrCreateParent({ name, email, password }) {
 
 async function signInChildWithCode({ firstName, lastName, code }) {
   const childCode = normalizeChildCode(code);
+  const localChild = findChildByLogin(firstName, lastName, childCode);
+
+  if (localChild) {
+    return { child: localChild, code: childCode };
+  }
 
   if (!hasDatabaseConnection()) {
-    const child = findChildByLogin(firstName, lastName, childCode);
-
-    if (!child) {
-      throw new Error("No child profile matches that name and code yet.");
-    }
-
-    return { child, code: childCode };
+    throw new Error("No child profile matches that name and code yet.");
   }
 
   const { data, error } = await supabaseClient.rpc("student_portal_by_code", {
@@ -928,7 +1017,7 @@ async function signInChildWithCode({ firstName, lastName, code }) {
 async function createChildProfile({ parentId, firstName, lastName, age, state }) {
   const name = `${firstName} ${lastName}`.trim();
 
-  if (!hasDatabaseConnection()) {
+  if (!hasDatabaseConnection() || !isDatabaseUuid(parentId)) {
     const child = {
       id: `child-${Date.now()}`,
       parentId,
@@ -969,9 +1058,14 @@ async function createChildProfile({ parentId, firstName, lastName, age, state })
 }
 
 async function deleteChildProfile(childId) {
-  if (hasDatabaseConnection()) {
-    const { error } = await supabaseClient.from("students").delete().eq("id", childId);
+  if (hasDatabaseConnection() && isDatabaseUuid(childId) && session && session.role === "academy") {
+    const { error } = await supabaseClient.rpc("academy_delete_student", {
+      target_student_id: childId
+    });
     if (error) throw error;
+  } else if (hasDatabaseConnection() && isDatabaseUuid(childId)) {
+    const { error } = await supabaseClient.from("students").delete().eq("id", childId);
+    if (error && (!session || session.role !== "academy")) throw error;
   }
 
   deleteChild(childId);
@@ -979,9 +1073,14 @@ async function deleteChildProfile(childId) {
 }
 
 async function deleteParentProfile(parentId) {
-  if (hasDatabaseConnection()) {
-    const { error } = await supabaseClient.from("parents").delete().eq("id", parentId);
+  if (hasDatabaseConnection() && isDatabaseUuid(parentId) && session && session.role === "academy") {
+    const { error } = await supabaseClient.rpc("academy_delete_parent", {
+      target_parent_id: parentId
+    });
     if (error) throw error;
+  } else if (hasDatabaseConnection() && isDatabaseUuid(parentId)) {
+    const { error } = await supabaseClient.from("parents").delete().eq("id", parentId);
+    if (error && (!session || session.role !== "academy")) throw error;
   }
 
   deleteParent(parentId);
@@ -990,6 +1089,7 @@ async function deleteParentProfile(parentId) {
 
 async function saveAttemptToDatabase(attempt, child) {
   if (!hasDatabaseConnection()) return;
+  if (!isDatabaseUuid(attempt.childId)) return;
 
   if (session && session.role === "kid" && session.childCode) {
     const { error } = await supabaseClient.rpc("submit_student_attempt", {
@@ -1088,6 +1188,7 @@ function saveDemoData() {
   localStorage.setItem(DATA_KEY, JSON.stringify(demoData));
 }
 
+ensureDemoAccounts();
 removeSeedAttempts();
 normalizeDemoData();
 
@@ -2751,20 +2852,28 @@ kidLoginForm.addEventListener("submit", async (event) => {
   }
 });
 
-academyLoginForm.addEventListener("submit", (event) => {
+academyLoginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(academyLoginForm);
-  const code = String(formData.get("academyCode") || "").trim().toUpperCase();
+  const email = String(formData.get("academyEmail") || "").trim().toLowerCase();
+  const password = String(formData.get("academyPassword") || "");
 
-  if (code !== "ACADEMY") {
-    authMessage.textContent = "Enter the demo academy code.";
+  if (!email || !password) {
+    authMessage.textContent = "Enter the admin email and password.";
     return;
   }
 
-  session = { role: "academy" };
-  saveSession();
-  authMessage.textContent = "";
-  render();
+  authMessage.textContent = "Checking admin login...";
+
+  try {
+    const admin = await signInAcademyAdmin({ email, password });
+    session = { role: "academy", adminEmail: admin.email, adminId: admin.userId || "local-admin" };
+    saveSession();
+    authMessage.textContent = "";
+    render();
+  } catch (error) {
+    authMessage.textContent = getDatabaseErrorMessage(error);
+  }
 });
 
 logoutButton.addEventListener("click", async () => {
@@ -3013,16 +3122,20 @@ nextButton.addEventListener("click", () => {
 async function startApp() {
   if (hasDatabaseConnection()) {
     try {
-      const { data } = await supabaseClient.auth.getSession();
-      const databaseSession = data && data.session;
+      if (session && session.role === "academy") {
+        await loadAcademyData();
+      } else {
+        const { data } = await supabaseClient.auth.getSession();
+        const databaseSession = data && data.session;
 
-      if (databaseSession && databaseSession.user) {
+        if (databaseSession && databaseSession.user) {
         await loadDatabaseData();
         const parent = demoData.parents.find((item) => item.id === databaseSession.user.id);
 
-        if (parent && (!session || session.role === "parent")) {
-          session = { role: "parent", parentId: parent.id };
-          saveSession();
+          if (parent && (!session || session.role === "parent")) {
+            session = { role: "parent", parentId: parent.id };
+            saveSession();
+          }
         }
       }
     } catch (error) {

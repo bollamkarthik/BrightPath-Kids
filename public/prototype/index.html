@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BrightPath Kids</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" />
+    <meta name="theme-color" content="#5b6cff" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./config.js"></script>
   </head>
@@ -49,10 +53,12 @@
             <strong>If you are the organizer, click here to login.</strong>
           </summary>
           <form class="organizer-form" id="academyLoginForm">
-            <label for="academyCode">Academy code</label>
-            <input id="academyCode" name="academyCode" autocomplete="off" value="ACADEMY" />
+            <label for="academyEmail">Admin email</label>
+            <input id="academyEmail" name="academyEmail" autocomplete="email" placeholder="owner@example.com" />
+            <label for="academyPassword">Admin password</label>
+            <input id="academyPassword" name="academyPassword" type="password" autocomplete="current-password" />
             <button type="submit">Open master dashboard</button>
-            <p class="helper-text">Demo owner code: <strong>ACADEMY</strong></p>
+            <p class="helper-text">Only approved academy admin accounts can open the master dashboard.</p>
           </form>
         </details>
       </div>

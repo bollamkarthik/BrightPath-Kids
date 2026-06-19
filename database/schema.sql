@@ -260,6 +260,85 @@ $$;
 grant execute on function public.student_portal_by_code(text, text, text) to anon, authenticated;
 grant execute on function public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, jsonb) to anon, authenticated;
 
+drop function if exists public.academy_roster(text);
+drop function if exists public.academy_delete_student(text, uuid);
+drop function if exists public.academy_delete_parent(text, uuid);
+
+create or replace function public.academy_roster()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  parent_rows jsonb;
+  student_rows jsonb;
+  attempt_rows jsonb;
+begin
+  if not public.is_academy_admin() then
+    raise exception 'This account is not an academy admin.';
+  end if;
+
+  select coalesce(jsonb_agg(to_jsonb(parents) order by parents.created_at), '[]'::jsonb)
+  into parent_rows
+  from public.parents;
+
+  select coalesce(jsonb_agg(to_jsonb(students) order by students.created_at), '[]'::jsonb)
+  into student_rows
+  from public.students;
+
+  select coalesce(jsonb_agg(to_jsonb(attempts) order by attempts.created_at desc), '[]'::jsonb)
+  into attempt_rows
+  from public.attempts;
+
+  return jsonb_build_object(
+    'parents', parent_rows,
+    'students', student_rows,
+    'attempts', attempt_rows
+  );
+end;
+$$;
+
+create or replace function public.academy_delete_student(
+  target_student_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_academy_admin() then
+    raise exception 'This account is not an academy admin.';
+  end if;
+
+  delete from public.students
+  where id = target_student_id;
+end;
+$$;
+
+create or replace function public.academy_delete_parent(
+  target_parent_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_academy_admin() then
+    raise exception 'This account is not an academy admin.';
+  end if;
+
+  delete from public.parents
+  where id = target_parent_id;
+end;
+$$;
+
+grant execute on function public.academy_roster() to authenticated;
+grant execute on function public.academy_delete_student(uuid) to authenticated;
+grant execute on function public.academy_delete_parent(uuid) to authenticated;
+
 create or replace view public.student_work_summary as
 select
   students.id as child_id,
