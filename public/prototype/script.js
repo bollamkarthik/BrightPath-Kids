@@ -718,40 +718,15 @@ const STATES = [
 
 function createDemoData() {
   return {
-    parents: [
-      { id: "parent-demo", name: "Karthik", email: "parent@example.com", password: "demo123" }
-    ],
-    children: [
-      { id: "child-avery", parentId: "parent-demo", firstName: "Avery", lastName: "Stone", name: "Avery Stone", age: 8, state: "CA", code: "AVERY123" },
-      { id: "child-maya", parentId: "parent-demo", firstName: "Maya", lastName: "Patel", name: "Maya Patel", age: 12, state: "TX", code: "MAYA456" }
-    ],
+    parents: [],
+    children: [],
     attempts: [],
     parentQuestions: []
   };
 }
 
-function getDemoParent() {
-  return { id: "parent-demo", name: "Karthik", email: "parent@example.com", password: "demo123" };
-}
-
-function getDemoChildren() {
-  return [
-    { id: "child-avery", parentId: "parent-demo", firstName: "Avery", lastName: "Stone", name: "Avery Stone", age: 8, state: "CA", code: "AVERY123" },
-    { id: "child-maya", parentId: "parent-demo", firstName: "Maya", lastName: "Patel", name: "Maya Patel", age: 12, state: "TX", code: "MAYA456" }
-  ];
-}
-
 function ensureDemoAccounts() {
-  const demoParent = getDemoParent();
-  if (!demoData.parents.some((parent) => parent.id === demoParent.id)) {
-    demoData.parents.push(demoParent);
-  }
-
-  getDemoChildren().forEach((demoChild) => {
-    if (!demoData.children.some((child) => child.id === demoChild.id)) {
-      demoData.children.push(demoChild);
-    }
-  });
+  removeDefaultProfiles();
 }
 
 function readJson(key, fallback) {
@@ -1303,13 +1278,40 @@ function removeSeedAttempts() {
   }
 }
 
+function removeDefaultProfiles() {
+  const defaultParentIds = new Set(["parent-demo"]);
+  const defaultChildIds = new Set(["child-avery", "child-maya"]);
+  const defaultChildCodes = new Set(["AVERY123", "MAYA456"]);
+
+  const originalData = JSON.stringify(demoData);
+  demoData.parents = (demoData.parents || []).filter((parent) => !defaultParentIds.has(parent.id));
+  demoData.children = (demoData.children || []).filter((child) => {
+    const childName = String(child.name || `${child.firstName || ""} ${child.lastName || ""}`).trim().toLowerCase();
+    return !defaultChildIds.has(child.id)
+      && !defaultParentIds.has(child.parentId)
+      && !defaultChildCodes.has(String(child.code || "").toUpperCase())
+      && childName !== "avery stone"
+      && childName !== "maya patel";
+  });
+  demoData.attempts = (demoData.attempts || []).filter((attempt) => !defaultChildIds.has(attempt.childId));
+  demoData.parentQuestions = (demoData.parentQuestions || []).filter((question) => !defaultChildIds.has(question.childId));
+
+  if (session && (defaultParentIds.has(session.parentId) || defaultChildIds.has(session.childId))) {
+    session = null;
+    localStorage.removeItem(SESSION_KEY);
+  }
+
+  if (JSON.stringify(demoData) !== originalData) {
+    saveDemoData();
+  }
+}
+
 function normalizeDemoData() {
   demoData.parentQuestions = demoData.parentQuestions || [];
   demoData.children = demoData.children.map((child) => {
     const nameParts = String(child.name || "").trim().split(/\s+/).filter(Boolean);
     const firstName = child.firstName || nameParts[0] || "Student";
-    const demoLastName = child.id === "child-avery" ? "Stone" : child.id === "child-maya" ? "Patel" : "Student";
-    const lastName = child.lastName || nameParts.slice(1).join(" ") || demoLastName;
+    const lastName = child.lastName || nameParts.slice(1).join(" ") || "Student";
 
     return {
       ...child,
