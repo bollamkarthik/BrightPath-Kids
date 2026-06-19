@@ -21,10 +21,12 @@ Your public demo website will be live.
 
 This version is still a demo. It stores parent, student, and answer data in the browser. That is okay for testing the idea, but not for a real academy.
 
-For a real working app, the next phase is:
+For a real working app, start with:
 
-1. Add Supabase authentication.
-2. Add database tables for parents, students, questions, attempts, and placement results.
-3. Move answer saving from browser storage to the database.
-4. Protect each parent dashboard so parents only see their own children.
-5. Add admin/master permissions.
+1. Run `database/schema.sql` in your Supabase SQL Editor.
+2. Copy your Supabase anon public key.
+3. Paste it into `public/prototype/config.js`.
+4. Upload the changed files to GitHub.
+5. Let Vercel redeploy.
+
+See `database/SETUP_SUPABASE.md` for the exact database setup steps.
