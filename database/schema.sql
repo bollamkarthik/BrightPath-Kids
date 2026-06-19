@@ -143,6 +143,123 @@ create policy "admins can read academy admin table"
 on public.academy_admins for select
 using (user_id = auth.uid());
 
+create or replace function public.student_portal_by_code(
+  student_first_name text,
+  student_last_name text,
+  student_code text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_student public.students%rowtype;
+  student_attempts jsonb;
+begin
+  select *
+  into selected_student
+  from public.students
+  where lower(first_name) = lower(trim(student_first_name))
+    and lower(last_name) = lower(trim(student_last_name))
+    and upper(code) = upper(trim(student_code))
+  limit 1;
+
+  if not found then
+    raise exception 'No student matches that name and child code.';
+  end if;
+
+  select coalesce(jsonb_agg(to_jsonb(attempts) order by attempts.created_at desc), '[]'::jsonb)
+  into student_attempts
+  from public.attempts
+  where attempts.child_id = selected_student.id;
+
+  return jsonb_build_object(
+    'student', to_jsonb(selected_student),
+    'attempts', student_attempts
+  );
+end;
+$$;
+
+create or replace function public.submit_student_attempt(
+  student_id uuid,
+  student_code text,
+  attempt_subject text,
+  attempt_path text,
+  attempt_mode text,
+  attempt_skill text,
+  attempt_difficulty text,
+  attempt_question text,
+  attempt_answer text,
+  attempt_correct_answer text,
+  attempt_explanation text,
+  attempt_correct boolean,
+  attempt_created_at timestamptz,
+  student_placement jsonb default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_student public.students%rowtype;
+  saved_attempt public.attempts%rowtype;
+begin
+  select *
+  into selected_student
+  from public.students
+  where id = student_id
+    and upper(code) = upper(trim(student_code))
+  limit 1;
+
+  if not found then
+    raise exception 'The child code does not match this student.';
+  end if;
+
+  insert into public.attempts (
+    child_id,
+    subject,
+    path,
+    mode,
+    skill,
+    difficulty,
+    question,
+    answer,
+    correct_answer,
+    explanation,
+    correct,
+    created_at
+  )
+  values (
+    selected_student.id,
+    attempt_subject,
+    attempt_path,
+    attempt_mode,
+    attempt_skill,
+    attempt_difficulty,
+    attempt_question,
+    attempt_answer,
+    attempt_correct_answer,
+    attempt_explanation,
+    attempt_correct,
+    coalesce(attempt_created_at, now())
+  )
+  returning * into saved_attempt;
+
+  if student_placement is not null then
+    update public.students
+    set placement = student_placement
+    where id = selected_student.id;
+  end if;
+
+  return to_jsonb(saved_attempt);
+end;
+$$;
+
+grant execute on function public.student_portal_by_code(text, text, text) to anon, authenticated;
+grant execute on function public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, jsonb) to anon, authenticated;
+
 create or replace view public.student_work_summary as
 select
   students.id as child_id,

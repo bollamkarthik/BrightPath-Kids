@@ -799,6 +799,10 @@ function getDatabaseErrorMessage(error) {
   return error && error.message ? error.message : "The database did not accept that change yet.";
 }
 
+function normalizeChildCode(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
 async function loadDatabaseData() {
   if (!hasDatabaseConnection()) return;
 
@@ -873,6 +877,54 @@ async function signInOrCreateParent({ name, email, password }) {
   return mapParentFromRow(parentRow);
 }
 
+async function signInChildWithCode({ firstName, lastName, code }) {
+  const childCode = normalizeChildCode(code);
+
+  if (!hasDatabaseConnection()) {
+    const child = findChildByLogin(firstName, lastName, childCode);
+
+    if (!child) {
+      throw new Error("No child profile matches that name and code yet.");
+    }
+
+    return { child, code: childCode };
+  }
+
+  const { data, error } = await supabaseClient.rpc("student_portal_by_code", {
+    student_first_name: firstName,
+    student_last_name: lastName,
+    student_code: childCode
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const child = mapChildFromRow(data.student);
+  const attempts = (data.attempts || []).map(mapAttemptFromRow);
+
+  demoData.children = [
+    ...demoData.children.filter((item) => item.id !== child.id),
+    child
+  ];
+  demoData.attempts = [
+    ...demoData.attempts.filter((attempt) => attempt.childId !== child.id),
+    ...attempts
+  ];
+
+  if (!demoData.parents.some((parent) => parent.id === child.parentId)) {
+    demoData.parents.push({
+      id: child.parentId,
+      name: "Parent",
+      email: "",
+      password: ""
+    });
+  }
+
+  saveDemoData();
+  return { child, code: childCode };
+}
+
 async function createChildProfile({ parentId, firstName, lastName, age, state }) {
   const name = `${firstName} ${lastName}`.trim();
 
@@ -938,6 +990,31 @@ async function deleteParentProfile(parentId) {
 
 async function saveAttemptToDatabase(attempt, child) {
   if (!hasDatabaseConnection()) return;
+
+  if (session && session.role === "kid" && session.childCode) {
+    const { error } = await supabaseClient.rpc("submit_student_attempt", {
+      student_id: attempt.childId,
+      student_code: session.childCode,
+      attempt_subject: attempt.subject,
+      attempt_path: attempt.path,
+      attempt_mode: attempt.mode,
+      attempt_skill: attempt.skill,
+      attempt_difficulty: attempt.difficulty,
+      attempt_question: attempt.question,
+      attempt_answer: attempt.answer,
+      attempt_correct_answer: attempt.correctAnswer,
+      attempt_explanation: attempt.explanation,
+      attempt_correct: attempt.correct,
+      attempt_created_at: new Date(attempt.createdAt).toISOString(),
+      student_placement: child && child.placement ? child.placement : null
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return;
+  }
 
   const { error: attemptError } = await supabaseClient.from("attempts").insert({
     child_id: attempt.childId,
@@ -1065,6 +1142,16 @@ function findChildByFullName(firstName, lastName) {
   return demoData.children.find((child) => {
     return normalizeNamePart(child.firstName) === targetFirst
       && normalizeNamePart(child.lastName) === targetLast;
+  });
+}
+
+function findChildByLogin(firstName, lastName, code) {
+  const targetCode = normalizeChildCode(code);
+
+  return demoData.children.find((child) => {
+    return normalizeNamePart(child.firstName) === normalizeNamePart(firstName)
+      && normalizeNamePart(child.lastName) === normalizeNamePart(lastName)
+      && normalizeChildCode(child.code) === targetCode;
   });
 }
 
@@ -2563,7 +2650,7 @@ function hasValidSession() {
   if (!session) return false;
   if (session.role === "parent") return Boolean(getCurrentParent());
   if (session.role === "academy") return true;
-  if (session.role === "kid") return Boolean(getCurrentChild());
+  if (session.role === "kid") return Boolean(getCurrentChild()) && (!hasDatabaseConnection() || Boolean(session.childCode));
   return false;
 }
 
@@ -2632,28 +2719,36 @@ parentLoginForm.addEventListener("submit", async (event) => {
   }
 });
 
-kidLoginForm.addEventListener("submit", (event) => {
+kidLoginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(kidLoginForm);
   const firstName = String(formData.get("kidFirstName") || "").trim();
   const lastName = String(formData.get("kidLastName") || "").trim();
-  const child = findChildByFullName(firstName, lastName);
+  const code = String(formData.get("kidCode") || "").trim();
 
-  if (!child) {
-    authMessage.textContent = "No child profile matches that first and last name yet.";
+  if (!firstName || !lastName || !code) {
+    authMessage.textContent = "Enter first name, last name, and child code.";
     return;
   }
 
-  session = { role: "kid", parentId: child.parentId, childId: child.id };
-  appState.age = getAgeGroup(child.age);
-  appState.path = null;
-  appState.index = 0;
-  appState.correct = 0;
-  appState.answered = 0;
-  appState.startedAt = Date.now();
-  saveSession();
-  authMessage.textContent = "";
-  render();
+  authMessage.textContent = hasDatabaseConnection() ? "Checking child code..." : "";
+
+  try {
+    const { child, code: childCode } = await signInChildWithCode({ firstName, lastName, code });
+
+    session = { role: "kid", parentId: child.parentId, childId: child.id, childCode };
+    appState.age = getAgeGroup(child.age);
+    appState.path = null;
+    appState.index = 0;
+    appState.correct = 0;
+    appState.answered = 0;
+    appState.startedAt = Date.now();
+    saveSession();
+    authMessage.textContent = "";
+    render();
+  } catch (error) {
+    authMessage.textContent = getDatabaseErrorMessage(error);
+  }
 });
 
 academyLoginForm.addEventListener("submit", (event) => {
@@ -2672,7 +2767,11 @@ academyLoginForm.addEventListener("submit", (event) => {
   render();
 });
 
-logoutButton.addEventListener("click", () => {
+logoutButton.addEventListener("click", async () => {
+  if (hasDatabaseConnection()) {
+    await supabaseClient.auth.signOut();
+  }
+
   session = null;
   saveSession();
   render();

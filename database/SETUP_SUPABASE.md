@@ -17,6 +17,7 @@ This creates:
 - placement results
 - academy admin table
 - safety rules so parents only see their own students
+- child-code login functions so kids only open their own work
 
 ## 2. Add Your Public Key
 
@@ -40,6 +41,7 @@ Upload these changed files to the same GitHub repo:
 
 - `public/prototype/index.html`
 - `public/prototype/config.js`
+- `public/prototype/script.js`
 - `database/schema.sql`
 - `database/SETUP_SUPABASE.md`
 
@@ -47,4 +49,4 @@ Vercel will redeploy after GitHub updates.
 
 ## Important Security Note
 
-For a real student app, child login should not use only first and last name. Use a child code or PIN so two students with the same name do not get mixed up and student data stays private.
+Child login now uses first name, last name, and a child code. Parents can see the code on their dashboard and give it to the child.

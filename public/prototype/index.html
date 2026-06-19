@@ -13,7 +13,7 @@
       <div class="auth-hero">
         <p class="eyebrow">Demo accounts</p>
         <h1>BrightPath for kids and parents</h1>
-        <p>Parents can add up to two child profiles and review progress. Kids can sign in with their first and last name.</p>
+        <p>Parents can add up to two child profiles and review progress. Kids sign in with their name and private child code.</p>
       </div>
 
       <div class="auth-grid">
@@ -37,8 +37,10 @@
           <input id="kidFirstName" name="kidFirstName" autocomplete="given-name" value="Avery" />
           <label for="kidLastName">Last name</label>
           <input id="kidLastName" name="kidLastName" autocomplete="family-name" value="Stone" />
+          <label for="kidCode">Child code</label>
+          <input id="kidCode" name="kidCode" autocomplete="off" value="AVERY123" />
           <button type="submit">Start learning</button>
-          <p class="helper-text">Try <strong>Avery Stone</strong>, or use the name saved by the parent.</p>
+          <p class="helper-text">Try <strong>Avery Stone</strong> with code <strong>AVERY123</strong>, or use the code shown in the parent dashboard.</p>
         </form>
 
         <details class="auth-card organizer-card">
