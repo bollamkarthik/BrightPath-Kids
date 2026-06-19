@@ -18,6 +18,7 @@
         <p class="eyebrow">BrightPath portal</p>
         <h1>BrightPath for kids and parents</h1>
         <p>Parents can add up to two child profiles and review progress. Kids sign in with their name and private child code.</p>
+        <button class="share-button" type="button" data-share-app>Share app</button>
       </div>
 
       <div class="auth-grid">
@@ -92,6 +93,7 @@
               <strong id="profileName">Avery</strong>
               <small id="profileMeta">12 day streak</small>
             </span>
+            <button class="logout-button" type="button" data-share-app>Share</button>
             <button class="logout-button" id="logoutButton" type="button">Log out</button>
           </div>
         </header>
@@ -113,7 +115,7 @@
           </div>
 
           <div>
-            <label for="topicSelect">Topic</label>
+            <label for="topicSelect">Tests / Practice</label>
             <select id="topicSelect"></select>
           </div>
 
@@ -167,13 +169,13 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Parent check</p>
-                <h2>Send a question</h2>
+                <h2>Send a test</h2>
               </div>
             </div>
             <form class="parent-question-form" id="parentQuestionForm">
               <div>
-                <label for="parentQuestionChild">Child</label>
-                <select id="parentQuestionChild" name="parentQuestionChild"></select>
+                <label for="parentQuestionChild">Students</label>
+                <select id="parentQuestionChild" name="parentQuestionChild" multiple></select>
               </div>
               <div>
                 <label for="parentQuestionSubject">Subject</label>
@@ -183,22 +185,45 @@
                 </select>
               </div>
               <div>
+                <label for="parentQuestionLevel">Level</label>
+                <select id="parentQuestionLevel" name="parentQuestionLevel">
+                  <option value="all">All levels</option>
+                  <option value="early">Level 1 (ages 4-6)</option>
+                  <option value="elementary">Level 2 (ages 7-10)</option>
+                  <option value="middle">Level 3 (ages 11-13)</option>
+                  <option value="teen">Level 4 (ages 14+)</option>
+                </select>
+              </div>
+              <div>
+                <label for="parentQuestionPath">Topic</label>
+                <select id="parentQuestionPath" name="parentQuestionPath"></select>
+              </div>
+              <div>
+                <label for="parentQuestionCount">Questions</label>
+                <select id="parentQuestionCount" name="parentQuestionCount">
+                  <option value="1">1 question</option>
+                  <option value="5" selected>5 questions</option>
+                  <option value="10">10 questions</option>
+                  <option value="20">20 questions</option>
+                </select>
+              </div>
+              <div>
                 <label for="parentQuestionPrompt">Prompt</label>
-                <input id="parentQuestionPrompt" name="parentQuestionPrompt" placeholder="Example: Solve this parent check" />
+                <input id="parentQuestionPrompt" name="parentQuestionPrompt" placeholder="Example: Complete this skill check" />
               </div>
               <div>
-                <label for="parentQuestionText">Question</label>
-                <input id="parentQuestionText" name="parentQuestionText" placeholder="Example: 12 x 7 = ?" />
+                <label for="parentQuestionText">Custom question</label>
+                <input id="parentQuestionText" name="parentQuestionText" placeholder="Optional: 12 x 7 = ?" />
               </div>
               <div>
-                <label for="parentQuestionAnswer">Correct answer</label>
-                <input id="parentQuestionAnswer" name="parentQuestionAnswer" placeholder="Example: 84" />
+                <label for="parentQuestionAnswer">Custom answer</label>
+                <input id="parentQuestionAnswer" name="parentQuestionAnswer" placeholder="Required only for custom question" />
               </div>
               <div>
                 <label for="parentQuestionExplanation">Explanation</label>
-                <input id="parentQuestionExplanation" name="parentQuestionExplanation" placeholder="Example: 12 x 7 means seven groups of twelve." />
+                <input id="parentQuestionExplanation" name="parentQuestionExplanation" placeholder="Optional custom explanation" />
               </div>
-              <button type="submit">Send question</button>
+              <button type="submit">Send test</button>
             </form>
           </section>
 

@@ -1639,13 +1639,27 @@ function renderParentChildManager(parent) {
 function renderParentQuestionManager(parent, isAcademy = false) {
   if ((!parent && !isAcademy) || !parentQuestionManager || !parentQuestionChild) return;
 
+  const selectedLevel = parentQuestionLevel ? parentQuestionLevel.value || "all" : "all";
   const children = isAcademy
     ? demoData.children
     : demoData.children.filter((child) => child.parentId === parent.id);
+  const filteredChildren = selectedLevel === "all"
+    ? children
+    : children.filter((child) => getAgeGroup(child.age) === selectedLevel);
 
   parentQuestionManager.classList.toggle("hidden", !children.length);
-  parentQuestionChild.innerHTML = children.map((child) => `
+  parentQuestionChild.innerHTML = filteredChildren.map((child) => `
     <option value="${escapeHtml(child.id)}">${escapeHtml(child.name)}${isAcademy ? ` - ${escapeHtml(getParentName(child.parentId))}` : ""}</option>
+  `).join("") || "<option value=\"\" disabled>No students match this level</option>";
+  renderParentQuestionTopicOptions();
+}
+
+function renderParentQuestionTopicOptions() {
+  if (!parentQuestionSubject || !parentQuestionPath) return;
+
+  const subject = parentQuestionSubject.value || "math";
+  parentQuestionPath.innerHTML = skills[subject].map((skill) => `
+    <option value="${escapeHtml(skill.key)}">${escapeHtml(skill.title)}</option>
   `).join("");
 }
 
@@ -1961,6 +1975,9 @@ const parentChildForm = document.querySelector("#parentChildForm");
 const parentQuestionManager = document.querySelector("#parentQuestionManager");
 const parentQuestionForm = document.querySelector("#parentQuestionForm");
 const parentQuestionChild = document.querySelector("#parentQuestionChild");
+const parentQuestionSubject = document.querySelector("#parentQuestionSubject");
+const parentQuestionPath = document.querySelector("#parentQuestionPath");
+const parentQuestionLevel = document.querySelector("#parentQuestionLevel");
 const parentChildState = document.querySelector("#parentChildState");
 const parentChildLimitNote = document.querySelector("#parentChildLimitNote");
 const parentRoster = document.querySelector("#parentRoster");
@@ -1976,6 +1993,28 @@ const answerInput = document.querySelector("#answerInput");
 const feedback = document.querySelector("#feedback");
 const hintButton = document.querySelector("#hintButton");
 const nextButton = document.querySelector("#nextButton");
+const shareButtons = document.querySelectorAll("[data-share-app]");
+
+async function shareAppLink() {
+  const appUrl = `${window.location.origin}/`;
+  const shareData = {
+    title: "BrightPath Kids",
+    text: "Join BrightPath Kids for English and math practice.",
+    url: appUrl
+  };
+
+  try {
+    if (navigator.share) {
+      await navigator.share(shareData);
+      return;
+    }
+
+    await navigator.clipboard.writeText(appUrl);
+    authMessage.textContent = "App link copied. Paste it into text, WhatsApp, or email.";
+  } catch {
+    authMessage.textContent = appUrl;
+  }
+}
 
 function normalize(value) {
   return value.trim().toLowerCase().replace(/\s+/g, "").replace(/,$/, "");
@@ -2599,6 +2638,20 @@ function getLevelPathQuestions(subject, path, ageGroup) {
   return mergeUniqueQuestions([...starterQuestions, ...extraQuestions, ...generatedQuestions]).slice(0, 20);
 }
 
+function buildParentTestQuestions({ subject, path, ageGroup, count, prompt }) {
+  const sourceQuestions = getLevelPathQuestions(subject, path, ageGroup);
+  const seed = [getTodayKey(), subject, path, ageGroup, "parent-test"].join("|");
+
+  return buildWorksheet(sourceQuestions, count, seed).map((question, index) => ({
+    subject,
+    prompt: prompt || `${getSubjectLabel(subject)} ${getAgeGroupLabel(ageGroup)} skill check`,
+    question: question.text,
+    answer: question.answer,
+    explanation: question.explanation || question.hint || "",
+    order: index + 1
+  }));
+}
+
 function getAdaptiveQuestions(subject, path, ageGroup, difficulty, size) {
   if (path) {
     const baseQuestions = getLevelPathQuestions(subject, path, ageGroup);
@@ -2751,33 +2804,53 @@ function getAnswerExplanation(question, submittedAnswer) {
 }
 
 function renderTopicSelect() {
+  const child = getCurrentChild();
+  const pendingTests = getChildParentQuestions(child && child.id)
+    .filter((question) => question.status === "pending");
   const subjectSkills = skills[appState.subject];
   const hasSelectedPath = subjectSkills.some((skill) => skill.key === appState.path);
 
-  if (!hasSelectedPath) {
+  if (appState.mode !== "parent-check" && !hasSelectedPath) {
     appState.path = null;
   }
 
+  const testOptions = pendingTests.length
+    ? `
+      <optgroup label="Tests">
+        ${pendingTests.map((question, index) => `
+          <option value="test:${escapeHtml(question.id)}" ${appState.parentQuestionId === question.id ? "selected" : ""}>
+            ${escapeHtml(`${getSubjectLabel(question.subject)} test ${index + 1}: ${question.question}`)}
+          </option>
+        `).join("")}
+      </optgroup>
+    `
+    : "";
+
   topicSelect.innerHTML = [
-    `<option value="" ${appState.path ? "" : "selected"}>Recommended practice</option>`,
-    ...subjectSkills.map((skill) => `
-      <option value="${escapeHtml(skill.key)}" ${appState.path === skill.key ? "selected" : ""}>${escapeHtml(skill.title)}</option>
-    `)
+    testOptions,
+    `<optgroup label="Practice">
+      <option value="" ${!appState.path && appState.mode !== "parent-check" ? "selected" : ""}>Recommended practice</option>
+      ${subjectSkills.map((skill) => `
+        <option value="${escapeHtml(skill.key)}" ${appState.path === skill.key && appState.mode !== "parent-check" ? "selected" : ""}>${escapeHtml(skill.title)}</option>
+      `).join("")}
+    </optgroup>`
   ].join("");
 }
 
 function syncLearnerMode() {
   const child = getCurrentChild();
-  const parentQuestion = getPendingParentQuestion(child);
+  const parentQuestion = appState.parentQuestionId
+    ? getParentQuestionById(appState.parentQuestionId)
+    : getPendingParentQuestion(child);
 
-  if (parentQuestion && appState.answered === 0) {
+  if (parentQuestion && parentQuestion.status === "pending" && appState.answered === 0) {
     appState.mode = "parent-check";
     appState.parentQuestionId = parentQuestion.id;
     appState.subject = parentQuestion.subject;
     return;
   }
 
-  if (appState.mode === "parent-check" && !parentQuestion) {
+  if (appState.mode === "parent-check" && (!parentQuestion || parentQuestion.status !== "pending")) {
     appState.mode = "practice";
     appState.parentQuestionId = null;
   }
@@ -3169,40 +3242,77 @@ parentQuestionForm.addEventListener("submit", async (event) => {
   const parent = getCurrentParent();
   const isAcademy = session && session.role === "academy";
   const formData = new FormData(parentQuestionForm);
-  const childId = String(formData.get("parentQuestionChild") || "");
-  const selectedChild = demoData.children.find((child) => child.id === childId);
+  const childIds = formData.getAll("parentQuestionChild").map(String).filter(Boolean);
   const subject = String(formData.get("parentQuestionSubject") || "math");
+  const selectedLevel = String(formData.get("parentQuestionLevel") || "all");
+  const path = String(formData.get("parentQuestionPath") || skills[subject][0].key);
+  const count = Math.min(20, Math.max(1, Number(formData.get("parentQuestionCount") || 5)));
   const prompt = String(formData.get("parentQuestionPrompt") || "").trim() || "Answer this parent check.";
-  const question = String(formData.get("parentQuestionText") || "").trim();
-  const answer = String(formData.get("parentQuestionAnswer") || "").trim();
-  const explanation = String(formData.get("parentQuestionExplanation") || "").trim();
+  const customQuestion = String(formData.get("parentQuestionText") || "").trim();
+  const customAnswer = String(formData.get("parentQuestionAnswer") || "").trim();
+  const customExplanation = String(formData.get("parentQuestionExplanation") || "").trim();
+  const selectedChildren = demoData.children.filter((child) => {
+    const canTarget = isAcademy || (parent && child.parentId === parent.id);
+    const matchesSelection = childIds.includes(child.id);
+    const matchesLevel = selectedLevel === "all" || getAgeGroup(child.age) === selectedLevel;
+    return canTarget && matchesSelection && matchesLevel;
+  });
 
-  if ((!parent && !isAcademy) || !childId || !question || !answer) {
-    authMessage.textContent = "Choose a child, enter a question, and add the correct answer.";
+  if ((!parent && !isAcademy) || !selectedChildren.length) {
+    authMessage.textContent = "Choose at least one student.";
     return;
   }
 
-  if (!selectedChild || (!isAcademy && selectedChild.parentId !== parent.id)) {
-    authMessage.textContent = "Choose one of your child profiles.";
+  if (customQuestion && !customAnswer) {
+    authMessage.textContent = "Add the correct answer for the custom question.";
     return;
   }
 
   try {
-    await createParentQuestion({
-      parentId: isAcademy ? selectedChild.parentId : parent.id,
-      childId,
-      subject,
-      prompt,
-      question,
-      answer,
-      explanation
-    });
+    let sentCount = 0;
+
+    for (const child of selectedChildren) {
+      const ageGroup = selectedLevel === "all" ? getAgeGroup(child.age) : selectedLevel;
+      const questions = customQuestion
+        ? [{
+          subject,
+          prompt,
+          question: customQuestion,
+          answer: customAnswer,
+          explanation: customExplanation
+        }]
+        : buildParentTestQuestions({ subject, path, ageGroup, count, prompt });
+
+      for (const item of questions) {
+        await createParentQuestion({
+          parentId: isAcademy ? child.parentId : parent.id,
+          childId: child.id,
+          subject: item.subject,
+          prompt: questions.length > 1 ? `${item.prompt} (${item.order || sentCount + 1}/${questions.length})` : item.prompt,
+          question: item.question,
+          answer: item.answer,
+          explanation: item.explanation
+        });
+        sentCount += 1;
+      }
+    }
+
     parentQuestionForm.reset();
-    authMessage.textContent = "Question sent to the child.";
+    renderParentQuestionTopicOptions();
+    authMessage.textContent = `${sentCount} question${sentCount === 1 ? "" : "s"} sent.`;
     renderParentDashboard();
   } catch (error) {
     authMessage.textContent = getDatabaseErrorMessage(error);
   }
+});
+
+parentQuestionSubject.addEventListener("change", () => {
+  renderParentQuestionTopicOptions();
+});
+
+parentQuestionLevel.addEventListener("change", () => {
+  const parent = getCurrentParent();
+  renderParentQuestionManager(parent, session && session.role === "academy");
 });
 
 academyManagement.addEventListener("click", async (event) => {
@@ -3284,8 +3394,23 @@ parentDashboard.addEventListener("input", (event) => {
 });
 
 topicSelect.addEventListener("change", () => {
-  appState.path = topicSelect.value || null;
-  appState.mode = "practice";
+  const selectedValue = topicSelect.value || "";
+  const selectedTestId = selectedValue.startsWith("test:")
+    ? selectedValue.slice(5)
+    : "";
+  const selectedTest = selectedTestId ? getParentQuestionById(selectedTestId) : null;
+
+  if (selectedTest && selectedTest.status === "pending") {
+    appState.path = null;
+    appState.mode = "parent-check";
+    appState.parentQuestionId = selectedTest.id;
+    appState.subject = selectedTest.subject;
+  } else {
+    appState.path = selectedValue || null;
+    appState.mode = "practice";
+    appState.parentQuestionId = null;
+  }
+
   appState.index = 0;
   appState.correct = 0;
   appState.answered = 0;
@@ -3309,6 +3434,10 @@ subjectButtons.forEach((button) => {
     appState.parentQuestionJustCompleted = false;
     render();
   });
+});
+
+shareButtons.forEach((button) => {
+  button.addEventListener("click", shareAppLink);
 });
 
 answerForm.addEventListener("submit", async (event) => {

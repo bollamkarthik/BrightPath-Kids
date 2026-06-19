@@ -50,9 +50,22 @@ html {
   max-width: 620px;
 }
 
-.auth-hero p:last-child {
+.auth-hero p {
   color: var(--muted);
   font-size: 1.08rem;
+}
+
+.share-button {
+  width: fit-content;
+  min-height: 44px;
+  margin-top: 16px;
+  padding: 0 18px;
+  color: #2f327d;
+  font-weight: 900;
+  background: #ffdd4a;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .12);
 }
 
 .auth-grid {
@@ -503,7 +516,7 @@ h2 {
 
 .parent-question-form {
   display: grid;
-  grid-template-columns: minmax(150px, .8fr) 130px repeat(2, minmax(180px, 1fr));
+  grid-template-columns: minmax(180px, 1.1fr) repeat(4, minmax(130px, .8fr));
   gap: 12px;
   align-items: end;
   padding: 16px;
@@ -512,8 +525,17 @@ h2 {
   border-radius: 8px;
 }
 
-.parent-question-form div:nth-child(5),
-.parent-question-form div:nth-child(6) {
+.parent-question-form div:nth-child(1) {
+  grid-row: span 2;
+}
+
+.parent-question-form select[multiple] {
+  min-height: 132px;
+}
+
+.parent-question-form div:nth-child(7),
+.parent-question-form div:nth-child(8),
+.parent-question-form div:nth-child(9) {
   grid-column: span 2;
 }
 
@@ -1480,9 +1502,12 @@ body {
     display: none;
   }
 
-  .parent-question-form div:nth-child(5),
-  .parent-question-form div:nth-child(6) {
+  .parent-question-form div:nth-child(1),
+  .parent-question-form div:nth-child(7),
+  .parent-question-form div:nth-child(8),
+  .parent-question-form div:nth-child(9) {
     grid-column: auto;
+    grid-row: auto;
   }
 
   .practice-layout {
