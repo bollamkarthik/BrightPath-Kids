@@ -24,15 +24,15 @@
       <div class="auth-grid">
         <form class="auth-card" id="parentLoginForm">
           <span class="auth-badge">Parent</span>
-          <h2>Parent login</h2>
+          <h2>Parent login / create account</h2>
           <label for="parentName">Name</label>
           <input id="parentName" name="parentName" autocomplete="name" placeholder="Parent name" />
           <label for="parentEmail">Email</label>
           <input id="parentEmail" name="parentEmail" autocomplete="email" placeholder="your@email.com" />
           <label for="parentPassword">Password</label>
           <input id="parentPassword" name="parentPassword" type="password" autocomplete="current-password" />
-          <button type="submit">Enter parent dashboard</button>
-          <p class="helper-text">New parent accounts can create child profiles and review saved progress.</p>
+          <button type="submit">Enter or create parent profile</button>
+          <p class="helper-text">New parents can use this same form to create their profile, then add up to two kids.</p>
         </form>
 
         <form class="auth-card" id="kidLoginForm">
@@ -182,6 +182,7 @@
                 <select id="parentQuestionSubject" name="parentQuestionSubject">
                   <option value="math">Math</option>
                   <option value="english">English</option>
+                  <option value="fun">Fun Activities</option>
                 </select>
               </div>
               <div>
@@ -207,27 +208,81 @@
                   <option value="20">20 questions</option>
                 </select>
               </div>
+              <div class="checkbox-field">
+                <label for="parentQuestionTimed">
+                  <input id="parentQuestionTimed" name="parentQuestionTimed" type="checkbox" />
+                  Timer challenge
+                </label>
+                <span>Compare who finishes the full test first.</span>
+              </div>
+              <div>
+                <label for="parentQuestionMode">Test type</label>
+                <select id="parentQuestionMode" name="parentQuestionMode">
+                  <option value="auto" selected>Auto-generate selected count</option>
+                  <option value="custom">One editable topic question</option>
+                </select>
+              </div>
               <div>
                 <label for="parentQuestionPrompt">Prompt</label>
                 <input id="parentQuestionPrompt" name="parentQuestionPrompt" placeholder="Example: Complete this skill check" />
               </div>
-              <div>
+              <div class="custom-question-field hidden">
                 <label for="parentQuestionText">Custom question</label>
-                <input id="parentQuestionText" name="parentQuestionText" placeholder="Optional: 12 x 7 = ?" />
+                <input id="parentQuestionText" name="parentQuestionText" placeholder="Example: 12 x 7 = ?" />
               </div>
-              <div>
+              <div class="custom-question-field hidden">
                 <label for="parentQuestionAnswer">Custom answer</label>
-                <input id="parentQuestionAnswer" name="parentQuestionAnswer" placeholder="Required only for custom question" />
+                <input id="parentQuestionAnswer" name="parentQuestionAnswer" placeholder="Correct answer" />
               </div>
-              <div>
+              <div class="custom-question-field hidden">
                 <label for="parentQuestionExplanation">Explanation</label>
                 <input id="parentQuestionExplanation" name="parentQuestionExplanation" placeholder="Optional custom explanation" />
               </div>
-              <button type="submit">Send test</button>
+              <button type="submit">Send selected test</button>
             </form>
+            <div class="timed-challenge-board" id="timedChallengeBoard"></div>
           </section>
 
           <section class="academy-management hidden" id="academyManagement" aria-label="Academy roster management">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Roster setup</p>
+                <h2>Add parent or student</h2>
+              </div>
+            </div>
+
+            <div class="academy-create-grid">
+              <form class="academy-create-card" id="academyParentForm">
+                <h3>Add parent</h3>
+                <label for="academyParentName">Parent name</label>
+                <input id="academyParentName" name="academyParentName" autocomplete="name" placeholder="Parent full name" />
+                <label for="academyParentEmail">Parent email</label>
+                <input id="academyParentEmail" name="academyParentEmail" autocomplete="email" placeholder="parent@email.com" />
+                <button type="submit">Add parent</button>
+                <p class="helper-text">The parent can create their password from the parent login screen using this email.</p>
+              </form>
+
+              <form class="academy-create-card" id="academyStudentForm">
+                <h3>Add student</h3>
+                <label for="academyStudentParent">Parent</label>
+                <select id="academyStudentParent" name="academyStudentParent"></select>
+                <label for="academyStudentFirstName">First name</label>
+                <input id="academyStudentFirstName" name="academyStudentFirstName" autocomplete="given-name" placeholder="Student first name" />
+                <label for="academyStudentLastName">Last name</label>
+                <input id="academyStudentLastName" name="academyStudentLastName" autocomplete="family-name" placeholder="Student last name" />
+                <label for="academyStudentAge">Starting level</label>
+                <select id="academyStudentAge" name="academyStudentAge">
+                  <option value="5">Level 1 (ages 4-6)</option>
+                  <option value="8" selected>Level 2 (ages 7-10)</option>
+                  <option value="12">Level 3 (ages 11-13)</option>
+                  <option value="15">Level 4 (ages 14+)</option>
+                </select>
+                <label for="academyStudentState">State</label>
+                <select id="academyStudentState" name="academyStudentState"></select>
+                <button type="submit">Add student</button>
+              </form>
+            </div>
+
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Roster cleanup</p>

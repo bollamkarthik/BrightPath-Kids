@@ -533,13 +533,65 @@ h2 {
   min-height: 132px;
 }
 
-.parent-question-form div:nth-child(7),
-.parent-question-form div:nth-child(8),
-.parent-question-form div:nth-child(9) {
+.parent-question-form .custom-question-field {
   grid-column: span 2;
 }
 
 .parent-question-form button {
+  min-height: 44px;
+  color: #fff;
+  font-weight: 900;
+  background: var(--ink);
+  border: 0;
+  border-radius: 8px;
+}
+
+.checkbox-field {
+  display: grid;
+  gap: 4px;
+}
+
+.checkbox-field label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.checkbox-field span {
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+.academy-create-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, .8fr) minmax(280px, 1.2fr);
+  gap: 14px;
+}
+
+.academy-create-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(255, 255, 255, .78);
+  border: 1px solid rgba(47, 50, 125, .08);
+  border-radius: 8px;
+}
+
+.academy-create-card h3 {
+  margin: 0;
+}
+
+.academy-create-card button {
   min-height: 44px;
   color: #fff;
   font-weight: 900;
@@ -568,6 +620,44 @@ h2 {
 .parent-question-note span {
   color: var(--muted);
   font-size: .92rem;
+}
+
+.timed-challenge-board {
+  display: grid;
+  gap: 10px;
+}
+
+.timed-challenge-board:empty {
+  display: none;
+}
+
+.challenge-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.challenge-card h3 {
+  margin: 0;
+  font-size: .95rem;
+}
+
+.challenge-card ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.challenge-card li {
+  color: var(--muted);
+}
+
+.challenge-card b {
+  color: var(--ink);
 }
 
 .report-grid {
@@ -1478,6 +1568,7 @@ body {
   }
 
   .auth-grid,
+  .academy-create-grid,
   .academy-summary,
   .parent-question-form,
   .management-grid,
@@ -1503,9 +1594,7 @@ body {
   }
 
   .parent-question-form div:nth-child(1),
-  .parent-question-form div:nth-child(7),
-  .parent-question-form div:nth-child(8),
-  .parent-question-form div:nth-child(9) {
+  .parent-question-form .custom-question-field {
     grid-column: auto;
     grid-row: auto;
   }

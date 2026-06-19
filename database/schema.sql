@@ -7,6 +7,18 @@ create table if not exists public.parents (
   created_at timestamptz not null default now()
 );
 
+alter table public.parents drop constraint if exists parents_id_fkey;
+alter table public.parents add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
+create unique index if not exists parents_auth_user_id_key on public.parents(auth_user_id) where auth_user_id is not null;
+update public.parents
+set auth_user_id = id
+where auth_user_id is null
+  and exists (
+    select 1
+    from auth.users
+    where users.id = parents.id
+  );
+
 create table if not exists public.students (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid not null references public.parents(id) on delete cascade,
@@ -22,7 +34,7 @@ create table if not exists public.students (
 create table if not exists public.attempts (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references public.students(id) on delete cascade,
-  subject text not null check (subject in ('math', 'english')),
+  subject text not null check (subject in ('math', 'english', 'fun')),
   path text,
   mode text,
   skill text,
@@ -39,7 +51,7 @@ create table if not exists public.parent_questions (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid not null references public.parents(id) on delete cascade,
   child_id uuid not null references public.students(id) on delete cascade,
-  subject text not null check (subject in ('math', 'english')),
+  subject text not null check (subject in ('math', 'english', 'fun')),
   prompt text not null default 'Answer this parent check.',
   question text not null,
   correct_answer text not null,
@@ -48,8 +60,21 @@ create table if not exists public.parent_questions (
   child_answer text,
   correct boolean,
   created_at timestamptz not null default now(),
-  answered_at timestamptz
+  answered_at timestamptz,
+  test_group_id text,
+  timed_challenge boolean not null default false,
+  challenge_started_at timestamptz,
+  challenge_finished_at timestamptz
 );
+
+alter table public.parent_questions add column if not exists test_group_id text;
+alter table public.parent_questions add column if not exists timed_challenge boolean not null default false;
+alter table public.parent_questions add column if not exists challenge_started_at timestamptz;
+alter table public.parent_questions add column if not exists challenge_finished_at timestamptz;
+alter table public.attempts drop constraint if exists attempts_subject_check;
+alter table public.attempts add constraint attempts_subject_check check (subject in ('math', 'english', 'fun'));
+alter table public.parent_questions drop constraint if exists parent_questions_subject_check;
+alter table public.parent_questions add constraint parent_questions_subject_check check (subject in ('math', 'english', 'fun'));
 
 create table if not exists public.academy_admins (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -78,18 +103,18 @@ $$;
 drop policy if exists "parents can read own profile" on public.parents;
 create policy "parents can read own profile"
 on public.parents for select
-using (id = auth.uid() or public.is_academy_admin());
+using (id = auth.uid() or auth_user_id = auth.uid() or public.is_academy_admin());
 
 drop policy if exists "parents can insert own profile" on public.parents;
 create policy "parents can insert own profile"
 on public.parents for insert
-with check (id = auth.uid());
+with check (id = auth.uid() or auth_user_id = auth.uid() or public.is_academy_admin());
 
 drop policy if exists "parents can update own profile" on public.parents;
 create policy "parents can update own profile"
 on public.parents for update
-using (id = auth.uid())
-with check (id = auth.uid());
+using (id = auth.uid() or auth_user_id = auth.uid())
+with check (id = auth.uid() or auth_user_id = auth.uid());
 
 drop policy if exists "admins can delete parents" on public.parents;
 create policy "admins can delete parents"
@@ -99,23 +124,63 @@ using (public.is_academy_admin());
 drop policy if exists "parents and admins can read students" on public.students;
 create policy "parents and admins can read students"
 on public.students for select
-using (parent_id = auth.uid() or public.is_academy_admin());
+using (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = students.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+);
 
 drop policy if exists "parents can add own students" on public.students;
 create policy "parents can add own students"
 on public.students for insert
-with check (parent_id = auth.uid());
+with check (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = students.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+);
 
 drop policy if exists "parents can update own students" on public.students;
 create policy "parents can update own students"
 on public.students for update
-using (parent_id = auth.uid())
-with check (parent_id = auth.uid());
+using (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = students.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+)
+with check (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = students.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+);
 
 drop policy if exists "parents and admins can delete students" on public.students;
 create policy "parents and admins can delete students"
 on public.students for delete
-using (parent_id = auth.uid() or public.is_academy_admin());
+using (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = students.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+);
 
 drop policy if exists "parents and admins can read attempts" on public.attempts;
 create policy "parents and admins can read attempts"
@@ -125,8 +190,9 @@ using (
   or exists (
     select 1
     from public.students
+    join public.parents on parents.id = students.parent_id
     where students.id = attempts.child_id
-      and students.parent_id = auth.uid()
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
   )
 );
 
@@ -137,8 +203,9 @@ with check (
   exists (
     select 1
     from public.students
+    join public.parents on parents.id = students.parent_id
     where students.id = attempts.child_id
-      and students.parent_id = auth.uid()
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
   )
 );
 
@@ -150,8 +217,9 @@ using (
   or exists (
     select 1
     from public.students
+    join public.parents on parents.id = students.parent_id
     where students.id = attempts.child_id
-      and students.parent_id = auth.uid()
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
   )
 );
 
@@ -159,8 +227,13 @@ drop policy if exists "parents and admins can read parent questions" on public.p
 create policy "parents and admins can read parent questions"
 on public.parent_questions for select
 using (
-  parent_id = auth.uid()
-  or public.is_academy_admin()
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = parent_questions.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
 );
 
 drop policy if exists "parents can send own child questions" on public.parent_questions;
@@ -168,27 +241,92 @@ create policy "parents can send own child questions"
 on public.parent_questions for insert
 with check (
   public.is_academy_admin()
-  or (
-    parent_id = auth.uid()
-    and exists (
-      select 1
-      from public.students
-      where students.id = parent_questions.child_id
-        and students.parent_id = auth.uid()
-    )
+  or exists (
+    select 1
+    from public.students
+    join public.parents on parents.id = students.parent_id
+    where students.id = parent_questions.child_id
+      and parents.id = parent_questions.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
   )
 );
 
 drop policy if exists "parents can update own child questions" on public.parent_questions;
 create policy "parents can update own child questions"
 on public.parent_questions for update
-using (parent_id = auth.uid() or public.is_academy_admin())
-with check (parent_id = auth.uid() or public.is_academy_admin());
+using (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = parent_questions.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+)
+with check (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = parent_questions.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+);
 
 drop policy if exists "parents and admins can delete parent questions" on public.parent_questions;
 create policy "parents and admins can delete parent questions"
 on public.parent_questions for delete
-using (parent_id = auth.uid() or public.is_academy_admin());
+using (
+  public.is_academy_admin()
+  or exists (
+    select 1
+    from public.parents
+    where parents.id = parent_questions.parent_id
+      and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  )
+);
+
+create or replace function public.claim_parent_profile(
+  parent_name text,
+  parent_email text
+)
+returns public.parents
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  saved_parent public.parents%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception 'Login required.';
+  end if;
+
+  update public.parents
+  set
+    auth_user_id = auth.uid(),
+    name = coalesce(nullif(trim(parent_name), ''), parents.name),
+    email = lower(trim(parent_email))
+  where lower(email) = lower(trim(parent_email))
+    and (auth_user_id is null or auth_user_id = auth.uid() or id = auth.uid())
+  returning * into saved_parent;
+
+  if found then
+    return saved_parent;
+  end if;
+
+  insert into public.parents (id, auth_user_id, name, email)
+  values (
+    auth.uid(),
+    auth.uid(),
+    coalesce(nullif(trim(parent_name), ''), 'Parent'),
+    lower(trim(parent_email))
+  )
+  returning * into saved_parent;
+
+  return saved_parent;
+end;
+$$;
 
 drop policy if exists "admins can read academy admin table" on public.academy_admins;
 create policy "admins can read academy admin table"
@@ -330,6 +468,7 @@ set search_path = public
 as $$
 declare
   selected_question public.parent_questions%rowtype;
+  pending_count integer;
 begin
   select parent_questions.*
   into selected_question
@@ -352,16 +491,60 @@ begin
   where id = question_id
   returning * into selected_question;
 
+  if selected_question.test_group_id is not null then
+    select count(*)
+    into pending_count
+    from public.parent_questions
+    where child_id = selected_question.child_id
+      and test_group_id = selected_question.test_group_id
+      and status = 'pending';
+
+    if pending_count = 0 then
+      update public.parent_questions
+      set challenge_finished_at = coalesce(answered_time, now())
+      where child_id = selected_question.child_id
+        and test_group_id = selected_question.test_group_id
+        and challenge_finished_at is null;
+    end if;
+  end if;
+
   return to_jsonb(selected_question);
+end;
+$$;
+
+create or replace function public.start_parent_question_group(
+  group_id text,
+  student_code text,
+  started_time timestamptz default now()
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.parent_questions
+  set challenge_started_at = coalesce(challenge_started_at, coalesce(started_time, now()))
+  from public.students
+  where students.id = parent_questions.child_id
+    and parent_questions.test_group_id = group_id
+    and upper(students.code) = upper(trim(student_code));
+
+  if not found then
+    raise exception 'The child code does not match this challenge.';
+  end if;
 end;
 $$;
 
 grant execute on function public.student_portal_by_code(text, text, text) to anon, authenticated;
 grant execute on function public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, jsonb) to anon, authenticated;
 grant execute on function public.complete_parent_question(uuid, text, text, boolean, timestamptz) to anon, authenticated;
+grant execute on function public.start_parent_question_group(text, text, timestamptz) to anon, authenticated;
 
 drop function if exists public.academy_roster(text);
 drop function if exists public.academy_roster();
+drop function if exists public.academy_create_parent(text, text);
+drop function if exists public.academy_create_student(uuid, text, text, integer, text, text);
 drop function if exists public.academy_delete_student(text, uuid);
 drop function if exists public.academy_delete_parent(text, uuid);
 
@@ -419,6 +602,96 @@ as $$
   select public.academy_roster('dashboard');
 $$;
 
+create or replace function public.academy_create_parent(
+  parent_name text,
+  parent_email text
+)
+returns public.parents
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  saved_parent public.parents%rowtype;
+begin
+  if not public.is_academy_admin() then
+    raise exception 'This account is not an academy admin.';
+  end if;
+
+  if nullif(trim(parent_name), '') is null or nullif(trim(parent_email), '') is null then
+    raise exception 'Parent name and email are required.';
+  end if;
+
+  insert into public.parents (id, name, email)
+  values (gen_random_uuid(), trim(parent_name), lower(trim(parent_email)))
+  on conflict (email) do update
+  set name = excluded.name
+  returning * into saved_parent;
+
+  return saved_parent;
+end;
+$$;
+
+create or replace function public.academy_create_student(
+  target_parent_id uuid,
+  student_first_name text,
+  student_last_name text,
+  student_age integer,
+  student_state text,
+  requested_code text default null
+)
+returns public.students
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  saved_student public.students%rowtype;
+  base_code text;
+  final_code text;
+begin
+  if not public.is_academy_admin() then
+    raise exception 'This account is not an academy admin.';
+  end if;
+
+  if not exists (select 1 from public.parents where id = target_parent_id) then
+    raise exception 'Choose an existing parent before adding a student.';
+  end if;
+
+  if nullif(trim(student_first_name), '') is null or nullif(trim(student_last_name), '') is null then
+    raise exception 'Student first and last name are required.';
+  end if;
+
+  base_code := upper(regexp_replace(trim(student_first_name || student_last_name), '[^a-zA-Z0-9]', '', 'g'));
+  base_code := coalesce(nullif(left(base_code, 6), ''), 'KID');
+  final_code := coalesce(nullif(upper(trim(requested_code)), ''), base_code || floor(100 + random() * 900)::int::text);
+
+  while exists (select 1 from public.students where code = final_code) loop
+    final_code := base_code || floor(100 + random() * 900)::int::text;
+  end loop;
+
+  insert into public.students (
+    parent_id,
+    first_name,
+    last_name,
+    age,
+    state,
+    code
+  )
+  values (
+    target_parent_id,
+    trim(student_first_name),
+    trim(student_last_name),
+    least(18, greatest(4, coalesce(student_age, 8))),
+    upper(left(coalesce(nullif(trim(student_state), ''), 'NA'), 2)),
+    final_code
+  )
+  returning * into saved_student;
+
+  return saved_student;
+end;
+$$;
+
 create or replace function public.academy_delete_student(
   target_student_id uuid
 )
@@ -457,6 +730,9 @@ $$;
 
 grant execute on function public.academy_roster(text) to anon, authenticated;
 grant execute on function public.academy_roster() to anon, authenticated;
+grant execute on function public.claim_parent_profile(text, text) to anon, authenticated;
+grant execute on function public.academy_create_parent(text, text) to anon, authenticated;
+grant execute on function public.academy_create_student(uuid, text, text, integer, text, text) to anon, authenticated;
 grant execute on function public.academy_delete_student(uuid) to anon, authenticated;
 grant execute on function public.academy_delete_parent(uuid) to anon, authenticated;
 

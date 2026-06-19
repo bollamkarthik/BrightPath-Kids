@@ -9,6 +9,7 @@ const appState = {
   answered: 0,
   startedAt: Date.now(),
   parentQuestionId: null,
+  parentTestGroupId: null,
   parentQuestionJustCompleted: false
 };
 
@@ -122,31 +123,135 @@ const content = {
 
 const skills = {
   math: [
-    { key: "facts", icon: "x", title: "Fast Facts", text: "Daily arithmetic drills that stay short and focused.", color: "#ff6b6b" },
+    { key: "facts", icon: "?", title: "Mixed Math Practice", text: "Randomized math from operations, geometry, fractions, and algebra.", color: "#ff6b6b" },
+    { key: "numberSense", icon: "123", title: "Number Sense", text: "Place value, comparing, rounding, and number patterns.", color: "#4cc9f0" },
+    { key: "decimals", icon: ".5", title: "Decimals", text: "Decimal place value, operations, and comparisons.", color: "#f77f00" },
+    { key: "percents", icon: "%", title: "Percents", text: "Percent of a number, discounts, and percent change.", color: "#06d6a0" },
+    { key: "ratios", icon: "2:3", title: "Ratios", text: "Ratios, rates, proportions, and scaling.", color: "#ef476f" },
+    { key: "measurement", icon: "in", title: "Measurement", text: "Time, money, units, conversions, and real-world measures.", color: "#118ab2" },
+    { key: "wordProblems", icon: "?", title: "Word Problems", text: "Real-world mixed problem solving with careful reading.", color: "#ffd166" },
+    { key: "dataGraphs", icon: "bar", title: "Data & Graphs", text: "Graphs, tables, averages, range, and probability.", color: "#8338ec" },
     { key: "shapes", icon: "D", title: "Shapes + Space", text: "Visual geometry puzzles for early and advanced learners.", color: "#50d890" },
     { key: "fractions", icon: "1/2", title: "Fractions", text: "Bars, number lines, and step-by-step fraction practice.", color: "#8e62dc" },
     { key: "algebra", icon: "x", title: "Algebra Path", text: "Equation practice that gradually increases independence.", color: "#2f327d" }
   ],
   english: [
     { key: "phonics", icon: "Aa", title: "Phonics", text: "Letter sounds, blends, and early decoding practice.", color: "#ff6b6b" },
+    { key: "vocabulary", icon: "V", title: "Vocabulary", text: "Word meanings, synonyms, antonyms, roots, and context clues.", color: "#4cc9f0" },
+    { key: "spelling", icon: "abc", title: "Spelling", text: "Patterns, word parts, tricky words, and editing for spelling.", color: "#f77f00" },
     { key: "reading", icon: "Q", title: "Reading", text: "Short passages with comprehension checks.", color: "#50d890" },
+    { key: "comprehension", icon: "?", title: "Comprehension", text: "Main idea, details, inference, theme, and evidence.", color: "#06d6a0" },
     { key: "grammar", icon: "P", title: "Grammar", text: "Parts of speech, sentence structure, and editing.", color: "#8e62dc" },
+    { key: "partsOfSpeech", icon: "N", title: "Parts of Speech", text: "Nouns, verbs, adjectives, adverbs, pronouns, and more.", color: "#ef476f" },
+    { key: "punctuation", icon: "?!", title: "Punctuation", text: "End marks, commas, apostrophes, quotation marks, and semicolons.", color: "#118ab2" },
+    { key: "sentenceStructure", icon: "S", title: "Sentence Structure", text: "Complete sentences, clauses, fragments, run-ons, and clarity.", color: "#ffd166" },
     { key: "writing", icon: "W", title: "Writing", text: "Paragraph planning, revision, and vocabulary growth.", color: "#2f327d" }
+  ],
+  fun: [
+    { key: "generalKnowledge", icon: "GK", title: "General Knowledge", text: "Everyday facts, culture, inventions, and world knowledge.", color: "#ff6b6b" },
+    { key: "flags", icon: "flag", title: "Country Flags", text: "Identify flags, countries, capitals, and landmarks.", color: "#4cc9f0" },
+    { key: "geography", icon: "map", title: "Geography", text: "Continents, oceans, maps, capitals, and landforms.", color: "#06d6a0" },
+    { key: "animalsScience", icon: "sci", title: "Animals & Science", text: "Animals, habitats, planets, weather, and basic science.", color: "#f77f00" },
+    { key: "logicPuzzles", icon: "!", title: "Logic Puzzles", text: "Patterns, riddles, sequences, and reasoning games.", color: "#8338ec" }
   ]
 };
 
 const pathContent = {
   math: {
     facts: {
-      focus: "Fast Facts sprint",
-      description: "Build quick recall with short addition, subtraction, multiplication, and division bursts.",
-      level: "Facts",
-      mastery: "Fact Fluency",
+      focus: "Mixed math practice",
+      description: "Randomized questions across operations, number sense, decimals, percents, ratios, measurement, word problems, data, geometry, fractions, and algebra.",
+      level: "Mixed Math",
+      mastery: "Math Concepts",
       value: 61,
       questions: [
         { title: "Addition burst", prompt: "Solve quickly.", text: "9 + 8 = ?", answer: "17", hint: "Make 10 with 9 + 1, then add 7." },
         { title: "Multiplication burst", prompt: "Solve quickly.", text: "7 x 6 = ?", answer: "42", hint: "Six groups of seven is 42." },
         { title: "Division burst", prompt: "Solve quickly.", text: "56 / 8 = ?", answer: "7", hint: "Think 8 times what number makes 56?" }
+      ]
+    },
+    numberSense: {
+      focus: "Number sense path",
+      description: "Practice place value, ordering, rounding, and how numbers are built.",
+      level: "Number Sense",
+      mastery: "Number Reasoning",
+      value: 63,
+      questions: [
+        { title: "Place value", prompt: "What digit is in the tens place?", text: "347", answer: "4", hint: "The tens place is the second digit from the right." },
+        { title: "Compare numbers", prompt: "Which number is larger?", text: "608 or 680", answer: "680", hint: "Compare hundreds, then tens." },
+        { title: "Round number", prompt: "Round to the nearest ten.", text: "73", answer: "70", hint: "Look at the ones digit." }
+      ]
+    },
+    decimals: {
+      focus: "Decimals path",
+      description: "Work with tenths, hundredths, decimal operations, and comparisons.",
+      level: "Decimals",
+      mastery: "Decimal Sense",
+      value: 64,
+      questions: [
+        { title: "Compare decimals", prompt: "Which is larger?", text: "0.7 or 0.4", answer: "0.7", hint: "Compare tenths." },
+        { title: "Add decimals", prompt: "Add.", text: "1.2 + 0.5 = ?", answer: "1.7", hint: "Line up the decimal points." },
+        { title: "Write decimal", prompt: "Write five tenths as a decimal.", text: "five tenths", answer: "0.5", hint: "Tenths are one place after the decimal." }
+      ]
+    },
+    percents: {
+      focus: "Percents path",
+      description: "Practice percent of a number, discounts, tips, and percent change.",
+      level: "Percents",
+      mastery: "Percent Reasoning",
+      value: 65,
+      questions: [
+        { title: "Percent of number", prompt: "Find 10% of 50.", text: "10% of 50", answer: "5", hint: "10% means divide by 10." },
+        { title: "Half percent", prompt: "What is 50% of 18?", text: "50% of 18", answer: "9", hint: "50% means half." },
+        { title: "Discount", prompt: "A $20 item is 25% off. How much is the discount?", text: "25% of 20", answer: "5", hint: "25% is one fourth." }
+      ]
+    },
+    ratios: {
+      focus: "Ratios path",
+      description: "Use ratios, rates, unit rates, proportions, and scale relationships.",
+      level: "Ratios",
+      mastery: "Ratio Reasoning",
+      value: 66,
+      questions: [
+        { title: "Simplify ratio", prompt: "Simplify.", text: "6:9", answer: "2:3", hint: "Divide both parts by 3." },
+        { title: "Unit rate", prompt: "Find miles per hour.", text: "120 miles in 3 hours", answer: "40", hint: "Divide miles by hours." },
+        { title: "Scale", prompt: "If 2 cups make 6 servings, how many servings do 4 cups make?", text: "2 cups -> 6 servings, 4 cups -> ?", answer: "12", hint: "4 cups is double 2 cups." }
+      ]
+    },
+    measurement: {
+      focus: "Measurement path",
+      description: "Practice time, money, length, weight, volume, and unit conversions.",
+      level: "Measurement",
+      mastery: "Measurement Skills",
+      value: 62,
+      questions: [
+        { title: "Time", prompt: "How many minutes are in 1 hour?", text: "1 hour", answer: "60", hint: "One hour is 60 minutes." },
+        { title: "Money", prompt: "How many cents are in 3 quarters?", text: "3 quarters", answer: "75", hint: "Each quarter is 25 cents." },
+        { title: "Length", prompt: "How many inches are in 2 feet?", text: "2 feet", answer: "24", hint: "Each foot has 12 inches." }
+      ]
+    },
+    wordProblems: {
+      focus: "Word problems path",
+      description: "Solve real-world problems by choosing the right operation and checking the question.",
+      level: "Word Problems",
+      mastery: "Problem Solving",
+      value: 67,
+      questions: [
+        { title: "Combine groups", prompt: "A kid has 8 stickers and gets 6 more. How many now?", text: "8 stickers + 6 stickers", answer: "14", hint: "Getting more means add." },
+        { title: "Equal groups", prompt: "Four bags have 5 apples each. How many apples?", text: "4 bags, 5 apples each", answer: "20", hint: "Equal groups often mean multiply." },
+        { title: "Left over", prompt: "A class has 24 pencils and uses 9. How many are left?", text: "24 pencils, 9 used", answer: "15", hint: "Left means subtract." }
+      ]
+    },
+    dataGraphs: {
+      focus: "Data and graphs path",
+      description: "Read graphs, compare data, and practice mean, median, mode, range, and probability.",
+      level: "Data & Graphs",
+      mastery: "Data Reasoning",
+      value: 64,
+      questions: [
+        { title: "Mean", prompt: "Find the mean.", text: "4, 6, 8", answer: "6", hint: "Add the numbers and divide by 3." },
+        { title: "Range", prompt: "Find the range.", text: "3, 7, 10, 12", answer: "9", hint: "Subtract smallest from largest." },
+        { title: "Mode", prompt: "Find the mode.", text: "2, 5, 5, 7", answer: "5", hint: "The mode appears most often." }
       ]
     },
     shapes: {
@@ -199,6 +304,30 @@ const pathContent = {
         { title: "Rhyme check", prompt: "Which word rhymes with run?", text: "sun or sit", answer: "sun", hint: "Listen for the same ending sound." }
       ]
     },
+    vocabulary: {
+      focus: "Vocabulary path",
+      description: "Build word meaning, context clues, synonyms, antonyms, roots, and academic language.",
+      level: "Vocabulary",
+      mastery: "Word Meaning",
+      value: 66,
+      questions: [
+        { title: "Synonym", prompt: "Which word means almost the same as happy?", text: "joyful, cold, late", answer: "joyful", hint: "A synonym has a similar meaning." },
+        { title: "Antonym", prompt: "Which word means the opposite of tiny?", text: "huge, small, little", answer: "huge", hint: "An antonym means the opposite." },
+        { title: "Context clue", prompt: "What does chilly mean?", text: "The chilly wind made Ana zip her coat.", answer: "cold", hint: "The coat clue helps." }
+      ]
+    },
+    spelling: {
+      focus: "Spelling path",
+      description: "Practice spelling patterns, word parts, tricky words, and proofreading.",
+      level: "Spelling",
+      mastery: "Word Accuracy",
+      value: 63,
+      questions: [
+        { title: "Silent e", prompt: "Choose the correctly spelled word.", text: "cake or cak", answer: "cake", hint: "Silent e often makes the vowel long." },
+        { title: "Double letter", prompt: "Choose the correctly spelled word.", text: "running or runing", answer: "running", hint: "Double the final consonant before ing in this word." },
+        { title: "Common word", prompt: "Spell the word.", text: "because", answer: "because", hint: "Break it into parts: be-cause." }
+      ]
+    },
     reading: {
       focus: "Reading path",
       description: "Read short passages, find key details, and answer comprehension questions.",
@@ -211,6 +340,18 @@ const pathContent = {
         { title: "Inference", prompt: "Mia packed an umbrella. What might the weather be?", text: "cloudy sky", answer: "rainy", hint: "Why would someone bring an umbrella?" }
       ]
     },
+    comprehension: {
+      focus: "Comprehension path",
+      description: "Work on main idea, details, inference, theme, author's purpose, and text evidence.",
+      level: "Comprehension",
+      mastery: "Reading Thinking",
+      value: 68,
+      questions: [
+        { title: "Main idea", prompt: "What is the sentence mostly about?", text: "Bees help flowers grow by moving pollen.", answer: "bees", hint: "Find who or what the sentence is about." },
+        { title: "Inference", prompt: "What can you infer?", text: "The lights were off and nobody answered the door.", answer: "empty", hint: "Use clues from the sentence." },
+        { title: "Theme", prompt: "Name the theme.", text: "Nia practiced every day until the song felt easy.", answer: "perseverance", hint: "Think about the lesson." }
+      ]
+    },
     grammar: {
       focus: "Grammar path",
       description: "Work on nouns, verbs, punctuation, and sentence structure with quick feedback.",
@@ -221,6 +362,42 @@ const pathContent = {
         { title: "Find the noun", prompt: "Which word is the noun?", text: "The puppy runs.", answer: "puppy", hint: "A noun names a person, place, thing, or idea." },
         { title: "Pick the verb", prompt: "Which word is the action?", text: "Sam reads nightly.", answer: "reads", hint: "The verb tells what Sam does." },
         { title: "Punctuation", prompt: "Which mark ends a question?", text: ". ? !", answer: "?", hint: "A question asks something." }
+      ]
+    },
+    partsOfSpeech: {
+      focus: "Parts of speech path",
+      description: "Identify nouns, verbs, adjectives, adverbs, pronouns, conjunctions, and prepositions.",
+      level: "Parts of Speech",
+      mastery: "Grammar Basics",
+      value: 64,
+      questions: [
+        { title: "Noun", prompt: "Which word is the noun?", text: "The puppy runs.", answer: "puppy", hint: "A noun names a person, place, thing, or idea." },
+        { title: "Verb", prompt: "Which word is the verb?", text: "Sam reads nightly.", answer: "reads", hint: "A verb shows action or being." },
+        { title: "Adjective", prompt: "Which word describes the noun?", text: "The bright star shines.", answer: "bright", hint: "An adjective describes a noun." }
+      ]
+    },
+    punctuation: {
+      focus: "Punctuation path",
+      description: "Practice end marks, commas, apostrophes, quotation marks, colons, and semicolons.",
+      level: "Punctuation",
+      mastery: "Editing Marks",
+      value: 63,
+      questions: [
+        { title: "Question mark", prompt: "Which mark ends a question?", text: ". ? !", answer: "?", hint: "Questions use question marks." },
+        { title: "Comma", prompt: "Which needs a comma after it?", text: "After dinner we walked.", answer: "afterdinner", hint: "Introductory phrases often need commas." },
+        { title: "Apostrophe", prompt: "Choose the possessive form.", text: "the dog bone", answer: "dog'sbone", hint: "Use an apostrophe to show ownership." }
+      ]
+    },
+    sentenceStructure: {
+      focus: "Sentence structure path",
+      description: "Practice complete sentences, subjects, predicates, clauses, fragments, and run-ons.",
+      level: "Sentence Structure",
+      mastery: "Clear Sentences",
+      value: 65,
+      questions: [
+        { title: "Complete sentence", prompt: "Choose the complete sentence.", text: "The dog ran. / Because the dog", answer: "thedogran", hint: "A complete sentence has a full thought." },
+        { title: "Subject", prompt: "Find the subject.", text: "The bright stars shimmered.", answer: "stars", hint: "Ask who or what shimmered." },
+        { title: "Run-on", prompt: "What error is this?", text: "I ran home I was late.", answer: "runon", hint: "Two complete thoughts need punctuation or a joining word." }
       ]
     },
     writing: {
@@ -241,11 +418,11 @@ const pathContent = {
 const pathQuestionBank = {
   math: {
     facts: [
-      { skill: "Fast Facts", title: "Addition burst", prompt: "Solve quickly.", text: "9 + 8 = ?", answer: "17", hint: "Make 10, then add the rest." },
-      { skill: "Fast Facts", title: "Subtraction burst", prompt: "Solve quickly.", text: "15 - 7 = ?", answer: "8", hint: "7 plus what makes 15?" },
-      { skill: "Fast Facts", title: "Multiplication burst", prompt: "Solve quickly.", text: "7 x 6 = ?", answer: "42", hint: "Six groups of seven is 42." },
-      { skill: "Fast Facts", title: "Division burst", prompt: "Solve quickly.", text: "56 / 8 = ?", answer: "7", hint: "8 times what number makes 56?" },
-      { skill: "Fast Facts", title: "Missing addend", prompt: "Find the missing number.", text: "34 + ? = 50", answer: "16", hint: "Count from 34 to 50." }
+      { skill: "Operations", title: "Addition burst", prompt: "Solve quickly.", text: "9 + 8 = ?", answer: "17", hint: "Make 10, then add the rest." },
+      { skill: "Operations", title: "Subtraction burst", prompt: "Solve quickly.", text: "15 - 7 = ?", answer: "8", hint: "7 plus what makes 15?" },
+      { skill: "Operations", title: "Multiplication burst", prompt: "Solve quickly.", text: "7 x 6 = ?", answer: "42", hint: "Six groups of seven is 42." },
+      { skill: "Operations", title: "Division burst", prompt: "Solve quickly.", text: "56 / 8 = ?", answer: "7", hint: "8 times what number makes 56?" },
+      { skill: "Operations", title: "Missing addend", prompt: "Find the missing number.", text: "34 + ? = 50", answer: "16", hint: "Count from 34 to 50." }
     ],
     shapes: [
       { skill: "Geometry", title: "Count the sides", prompt: "How many sides does a hexagon have?", text: "hexagon", answer: "6", hint: "Hex means six." },
@@ -488,12 +665,12 @@ const adaptivePathQuestionBank = {
   math: {
     facts: {
       easy: [
-        { skill: "Fast Facts", title: "Confidence fact", prompt: "Solve.", text: "6 + 7 = ?", answer: "13", hint: "Make 10, then add 3." },
-        { skill: "Fast Facts", title: "Confidence fact", prompt: "Solve.", text: "18 - 9 = ?", answer: "9", hint: "Think 9 plus what makes 18?" }
+        { skill: "Operations", title: "Confidence fact", prompt: "Solve.", text: "6 + 7 = ?", answer: "13", hint: "Make 10, then add 3." },
+        { skill: "Operations", title: "Confidence fact", prompt: "Solve.", text: "18 - 9 = ?", answer: "9", hint: "Think 9 plus what makes 18?" }
       ],
       hard: [
-        { skill: "Fast Facts", title: "Challenge fact", prompt: "Solve mentally.", text: "125 + 76 = ?", answer: "201", hint: "Add 100 + 70, then 25 + 6." },
-        { skill: "Fast Facts", title: "Challenge fact", prompt: "Solve mentally.", text: "12 x 15 = ?", answer: "180", hint: "12 x 10 plus 12 x 5." }
+        { skill: "Operations", title: "Challenge fact", prompt: "Solve mentally.", text: "125 + 76 = ?", answer: "201", hint: "Add 100 + 70, then 25 + 6." },
+        { skill: "Operations", title: "Challenge fact", prompt: "Solve mentally.", text: "12 x 15 = ?", answer: "180", hint: "12 x 10 plus 12 x 5." }
       ]
     },
     shapes: {
@@ -811,7 +988,11 @@ function mapParentQuestionFromRow(row) {
     childAnswer: row.child_answer || "",
     correct: row.correct,
     createdAt: new Date(row.created_at).getTime(),
-    answeredAt: row.answered_at ? new Date(row.answered_at).getTime() : null
+    answeredAt: row.answered_at ? new Date(row.answered_at).getTime() : null,
+    testGroupId: row.test_group_id || "",
+    timedChallenge: Boolean(row.timed_challenge),
+    challengeStartedAt: row.challenge_started_at ? new Date(row.challenge_started_at).getTime() : null,
+    challengeFinishedAt: row.challenge_finished_at ? new Date(row.challenge_finished_at).getTime() : null
   };
 }
 
@@ -929,6 +1110,13 @@ async function signInOrCreateParent({ name, email, password }) {
   }
 
   if (!hasDatabaseConnection()) {
+    if (localParent && !localParent.password) {
+      localParent.name = name || localParent.name;
+      localParent.password = password;
+      saveDemoData();
+      return localParent;
+    }
+
     localParent = { id: `parent-${Date.now()}`, name, email, password };
     demoData.parents.push(localParent);
     saveDemoData();
@@ -960,10 +1148,10 @@ async function signInOrCreateParent({ name, email, password }) {
   }
 
   const { data: parentRow, error } = await supabaseClient
-    .from("parents")
-    .upsert({ id: user.id, name, email }, { onConflict: "id" })
-    .select()
-    .single();
+    .rpc("claim_parent_profile", {
+      parent_name: name,
+      parent_email: email
+    });
 
   if (error) {
     throw error;
@@ -1044,19 +1232,29 @@ async function createChildProfile({ parentId, firstName, lastName, age, state })
     return child;
   }
 
+  const isAcademy = session && session.role === "academy";
   const code = makeUniqueChildCode(name);
-  const { data, error } = await supabaseClient
-    .from("students")
-    .insert({
-      parent_id: parentId,
-      first_name: firstName,
-      last_name: lastName,
-      age: Math.min(18, Math.max(4, age || 8)),
-      state,
-      code
+  const { data, error } = isAcademy
+    ? await supabaseClient.rpc("academy_create_student", {
+      target_parent_id: parentId,
+      student_first_name: firstName,
+      student_last_name: lastName,
+      student_age: Math.min(18, Math.max(4, age || 8)),
+      student_state: state,
+      requested_code: code
     })
-    .select()
-    .single();
+    : await supabaseClient
+      .from("students")
+      .insert({
+        parent_id: parentId,
+        first_name: firstName,
+        last_name: lastName,
+        age: Math.min(18, Math.max(4, age || 8)),
+        state,
+        code
+      })
+      .select()
+      .single();
 
   if (error) {
     throw error;
@@ -1068,11 +1266,49 @@ async function createChildProfile({ parentId, firstName, lastName, age, state })
   return child;
 }
 
+async function createAcademyParentProfile({ name, email }) {
+  if (!hasDatabaseConnection()) {
+    const existingParent = demoData.parents.find((parent) => parent.email.toLowerCase() === email.toLowerCase());
+    if (existingParent) {
+      existingParent.name = name;
+      saveDemoData();
+      return existingParent;
+    }
+
+    const parent = {
+      id: `parent-${Date.now()}`,
+      name,
+      email,
+      password: ""
+    };
+    demoData.parents.push(parent);
+    saveDemoData();
+    return parent;
+  }
+
+  const { data, error } = await supabaseClient.rpc("academy_create_parent", {
+    parent_name: name,
+    parent_email: email
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const parent = mapParentFromRow(data);
+  demoData.parents = [
+    ...demoData.parents.filter((item) => item.id !== parent.id && item.email.toLowerCase() !== parent.email.toLowerCase()),
+    parent
+  ];
+  saveDemoData();
+  return parent;
+}
+
 function makeParentQuestionId() {
   return `parent-question-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 }
 
-async function createParentQuestion({ parentId, childId, subject, prompt, question, answer, explanation }) {
+async function createParentQuestion({ parentId, childId, subject, prompt, question, answer, explanation, testGroupId = "", timedChallenge = false }) {
   const parentQuestion = {
     id: makeParentQuestionId(),
     parentId,
@@ -1086,7 +1322,11 @@ async function createParentQuestion({ parentId, childId, subject, prompt, questi
     childAnswer: "",
     correct: null,
     createdAt: Date.now(),
-    answeredAt: null
+    answeredAt: null,
+    testGroupId,
+    timedChallenge,
+    challengeStartedAt: null,
+    challengeFinishedAt: null
   };
 
   if (hasDatabaseConnection() && isDatabaseUuid(parentId) && isDatabaseUuid(childId)) {
@@ -1099,7 +1339,9 @@ async function createParentQuestion({ parentId, childId, subject, prompt, questi
         prompt,
         question,
         correct_answer: answer,
-        explanation
+        explanation,
+        test_group_id: testGroupId || null,
+        timed_challenge: timedChallenge
       })
       .select()
       .single();
@@ -1131,16 +1373,93 @@ function getChildParentQuestions(childId) {
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
+function getChildParentQuestionGroups(childId) {
+  const grouped = getChildParentQuestions(childId)
+    .filter((question) => question.testGroupId)
+    .reduce((groups, question) => {
+      groups[question.testGroupId] = groups[question.testGroupId] || [];
+      groups[question.testGroupId].push(question);
+      return groups;
+    }, {});
+
+  return Object.entries(grouped)
+    .map(([groupId, questions]) => {
+      const sortedQuestions = [...questions].sort((a, b) => a.createdAt - b.createdAt);
+      const pending = sortedQuestions.filter((question) => question.status === "pending");
+      const answered = sortedQuestions.filter((question) => question.status === "answered");
+      const first = sortedQuestions[0];
+      return {
+        groupId,
+        questions: sortedQuestions,
+        pending,
+        answered,
+        subject: first.subject,
+        prompt: first.prompt,
+        timedChallenge: sortedQuestions.some((question) => question.timedChallenge),
+        createdAt: first.createdAt,
+        startedAt: first.challengeStartedAt,
+        finishedAt: first.challengeFinishedAt
+      };
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function getPendingParentQuestionGroups(child) {
+  if (!child) return [];
+
+  return getChildParentQuestionGroups(child.id)
+    .filter((group) => group.pending.length);
+}
+
+function getPendingParentQuestionInGroup(child, groupId) {
+  if (!child || !groupId) return null;
+
+  const group = getChildParentQuestionGroups(child.id)
+    .find((item) => item.groupId === groupId);
+
+  return group ? group.pending[0] || null : null;
+}
+
 function getPendingParentQuestion(child) {
   if (!child) return null;
 
   return getChildParentQuestions(child.id)
-    .filter((question) => question.status === "pending")
+    .filter((question) => question.status === "pending" && !question.testGroupId)
     .sort((a, b) => a.createdAt - b.createdAt)[0] || null;
 }
 
 function getParentQuestionById(questionId) {
   return (demoData.parentQuestions || []).find((question) => question.id === questionId) || null;
+}
+
+async function markParentQuestionGroupStarted(groupId, child) {
+  if (!groupId || !child) return;
+
+  const groupQuestions = (demoData.parentQuestions || []).filter((question) => {
+    return question.childId === child.id && question.testGroupId === groupId;
+  });
+
+  if (!groupQuestions.length || groupQuestions.every((question) => question.challengeStartedAt)) {
+    return;
+  }
+
+  const startedAt = Date.now();
+  groupQuestions.forEach((question) => {
+    question.challengeStartedAt = question.challengeStartedAt || startedAt;
+  });
+  saveDemoData();
+
+  if (hasDatabaseConnection() && session && session.childCode) {
+    const { error } = await supabaseClient.rpc("start_parent_question_group", {
+      group_id: groupId,
+      student_code: session.childCode,
+      started_time: new Date(startedAt).toISOString()
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
 }
 
 async function markParentQuestionAnswered(questionId, childAnswer, isCorrect) {
@@ -1151,6 +1470,22 @@ async function markParentQuestionAnswered(questionId, childAnswer, isCorrect) {
   parentQuestion.childAnswer = childAnswer;
   parentQuestion.correct = isCorrect;
   parentQuestion.answeredAt = Date.now();
+
+  if (parentQuestion.testGroupId) {
+    const groupQuestions = (demoData.parentQuestions || []).filter((question) => {
+      return question.childId === parentQuestion.childId && question.testGroupId === parentQuestion.testGroupId;
+    });
+    const isGroupFinished = groupQuestions.every((question) => {
+      return question.id === parentQuestion.id || question.status === "answered";
+    });
+
+    if (isGroupFinished) {
+      const finishedAt = parentQuestion.answeredAt;
+      groupQuestions.forEach((question) => {
+        question.challengeFinishedAt = question.challengeFinishedAt || finishedAt;
+      });
+    }
+  }
 
   if (hasDatabaseConnection() && isDatabaseUuid(questionId)) {
     const { error } = await supabaseClient.rpc("complete_parent_question", {
@@ -1587,6 +1922,14 @@ function renderAcademySummary(children) {
 }
 
 function renderAcademyManagement() {
+  renderStateOptions(academyStudentState, "CA");
+
+  if (academyStudentParent) {
+    academyStudentParent.innerHTML = demoData.parents.map((parent) => `
+      <option value="${escapeHtml(parent.id)}">${escapeHtml(parent.name)} - ${escapeHtml(parent.email)}</option>
+    `).join("") || "<option value=\"\" disabled selected>Add a parent first</option>";
+  }
+
   parentRoster.innerHTML = demoData.parents.map((parent) => {
     const childCount = getParentChildCount(parent.id);
 
@@ -1654,6 +1997,8 @@ function renderParentQuestionManager(parent, isAcademy = false) {
     <option value="${escapeHtml(child.id)}">${escapeHtml(child.name)}${isAcademy ? ` - ${escapeHtml(getParentName(child.parentId))}` : ""}</option>
   `).join("") || "<option value=\"\" disabled>No students match this level</option>";
   renderParentQuestionTopicOptions();
+  renderParentQuestionMode();
+  renderTimedChallengeBoard(children);
 }
 
 function renderParentQuestionTopicOptions() {
@@ -1663,6 +2008,141 @@ function renderParentQuestionTopicOptions() {
   parentQuestionPath.innerHTML = skills[subject].map((skill) => `
     <option value="${escapeHtml(skill.key)}">${escapeHtml(skill.title)}</option>
   `).join("");
+}
+
+function formatDuration(milliseconds) {
+  if (!milliseconds || milliseconds < 0) return "In progress";
+
+  const totalSeconds = Math.round(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+function renderTimedChallengeBoard(children) {
+  if (!timedChallengeBoard) return;
+
+  const childIds = new Set(children.map((child) => child.id));
+  const timedGroups = (demoData.parentQuestions || [])
+    .filter((question) => question.timedChallenge && question.testGroupId && childIds.has(question.childId))
+    .reduce((groups, question) => {
+      groups[question.testGroupId] = groups[question.testGroupId] || [];
+      groups[question.testGroupId].push(question);
+      return groups;
+    }, {});
+  const cards = Object.entries(timedGroups).map(([groupId, questions]) => {
+    const byChild = questions.reduce((groups, question) => {
+      groups[question.childId] = groups[question.childId] || [];
+      groups[question.childId].push(question);
+      return groups;
+    }, {});
+    const rows = Object.entries(byChild).map(([childId, childQuestions]) => {
+      const child = demoData.children.find((item) => item.id === childId);
+      const first = childQuestions[0];
+      const total = childQuestions.length;
+      const answered = childQuestions.filter((question) => question.status === "answered").length;
+      const startedAt = first.challengeStartedAt;
+      const finishedAt = first.challengeFinishedAt;
+      const duration = startedAt && finishedAt ? finishedAt - startedAt : null;
+      return {
+        childName: child ? child.name : "Student",
+        answered,
+        total,
+        duration,
+        finishedAt,
+        label: duration ? formatDuration(duration) : `${answered}/${total} done`
+      };
+    }).sort((a, b) => {
+      if (a.duration && b.duration) return a.duration - b.duration;
+      if (a.duration) return -1;
+      if (b.duration) return 1;
+      return b.answered - a.answered || a.childName.localeCompare(b.childName);
+    });
+    const firstQuestion = questions[0];
+
+    return `
+      <article class="challenge-card">
+        <h3>${escapeHtml(getSubjectLabel(firstQuestion.subject))} timer challenge</h3>
+        <ol>
+          ${rows.map((row) => `
+            <li><b>${escapeHtml(row.childName)}</b> - ${escapeHtml(row.label)}</li>
+          `).join("")}
+        </ol>
+      </article>
+    `;
+  }).join("");
+
+  timedChallengeBoard.innerHTML = cards;
+}
+
+function getParentQuestionPreviewLevel() {
+  const selectedLevel = parentQuestionLevel ? parentQuestionLevel.value || "all" : "all";
+
+  if (selectedLevel !== "all") {
+    return selectedLevel;
+  }
+
+  const firstSelectedChildId = parentQuestionChild
+    ? Array.from(parentQuestionChild.selectedOptions || []).map((option) => option.value).find(Boolean)
+    : "";
+  const child = firstSelectedChildId
+    ? demoData.children.find((item) => item.id === firstSelectedChildId)
+    : null;
+
+  return child ? getAgeGroup(child.age) : "elementary";
+}
+
+function preloadEditableParentQuestion() {
+  if (!parentQuestionMode || parentQuestionMode.value !== "custom") return;
+  if (!parentQuestionSubject || !parentQuestionPath || !parentQuestionText || !parentQuestionAnswer) return;
+
+  const subject = parentQuestionSubject.value || "math";
+  const path = parentQuestionPath.value || skills[subject][0].key;
+  const ageGroup = getParentQuestionPreviewLevel();
+  const prompt = parentQuestionPrompt && parentQuestionPrompt.value.trim()
+    ? parentQuestionPrompt.value.trim()
+    : `Complete this ${formatTopicName(path)} check.`;
+  const [question] = buildParentTestQuestions({
+    subject,
+    path,
+    ageGroup,
+    count: 1,
+    prompt
+  });
+
+  if (!question) return;
+
+  if (parentQuestionPrompt && !parentQuestionPrompt.value.trim()) {
+    parentQuestionPrompt.value = question.prompt;
+  }
+  parentQuestionText.value = question.question;
+  parentQuestionAnswer.value = question.answer;
+  if (parentQuestionExplanation) {
+    parentQuestionExplanation.value = question.explanation || "";
+  }
+}
+
+function renderParentQuestionMode() {
+  if (!parentQuestionMode) return;
+
+  const isCustom = parentQuestionMode.value === "custom";
+  parentQuestionCustomFields.forEach((field) => field.classList.toggle("hidden", !isCustom));
+
+  if (parentQuestionCount) {
+    parentQuestionCount.disabled = isCustom;
+  }
+
+  if (parentQuestionTimed) {
+    parentQuestionTimed.disabled = isCustom;
+    if (isCustom) {
+      parentQuestionTimed.checked = false;
+    }
+  }
+
+  if (isCustom) {
+    preloadEditableParentQuestion();
+  }
 }
 
 function renderParentQuestionStatus(child) {
@@ -1695,7 +2175,8 @@ function getSubjectLabel(subject) {
   const labels = {
     all: "All subjects",
     math: "Math",
-    english: "English"
+    english: "English",
+    fun: "Fun Activities"
   };
 
   return labels[subject] || labels.all;
@@ -1764,14 +2245,32 @@ function renderAcademyStudentSearch(childrenWithStats) {
 
 function formatTopicName(value) {
   const labels = {
-    facts: "Fast facts",
+    facts: "Mixed math practice",
+    numberSense: "Number sense",
+    decimals: "Decimals",
+    percents: "Percents",
+    ratios: "Ratios",
+    measurement: "Measurement",
+    wordProblems: "Word problems",
+    dataGraphs: "Data and graphs",
     shapes: "Shapes and space",
     fractions: "Fractions",
     algebra: "Algebra",
     phonics: "Phonics",
+    vocabulary: "Vocabulary",
+    spelling: "Spelling",
     reading: "Reading",
+    comprehension: "Comprehension",
     grammar: "Grammar",
+    partsOfSpeech: "Parts of speech",
+    punctuation: "Punctuation",
+    sentenceStructure: "Sentence structure",
     writing: "Writing",
+    generalKnowledge: "General knowledge",
+    flags: "Country flags",
+    geography: "Geography",
+    animalsScience: "Animals and science",
+    logicPuzzles: "Logic puzzles",
     timed: "Timed fluency",
     daily: "Daily practice"
   };
@@ -1980,8 +2479,21 @@ const parentQuestionChild = document.querySelector("#parentQuestionChild");
 const parentQuestionSubject = document.querySelector("#parentQuestionSubject");
 const parentQuestionPath = document.querySelector("#parentQuestionPath");
 const parentQuestionLevel = document.querySelector("#parentQuestionLevel");
+const parentQuestionCount = document.querySelector("#parentQuestionCount");
+const parentQuestionTimed = document.querySelector("#parentQuestionTimed");
+const parentQuestionMode = document.querySelector("#parentQuestionMode");
+const parentQuestionCustomFields = document.querySelectorAll(".custom-question-field");
+const parentQuestionText = document.querySelector("#parentQuestionText");
+const parentQuestionAnswer = document.querySelector("#parentQuestionAnswer");
+const parentQuestionExplanation = document.querySelector("#parentQuestionExplanation");
+const parentQuestionPrompt = document.querySelector("#parentQuestionPrompt");
+const timedChallengeBoard = document.querySelector("#timedChallengeBoard");
 const parentChildState = document.querySelector("#parentChildState");
 const parentChildLimitNote = document.querySelector("#parentChildLimitNote");
+const academyParentForm = document.querySelector("#academyParentForm");
+const academyStudentForm = document.querySelector("#academyStudentForm");
+const academyStudentParent = document.querySelector("#academyStudentParent");
+const academyStudentState = document.querySelector("#academyStudentState");
 const parentRoster = document.querySelector("#parentRoster");
 const childRoster = document.querySelector("#childRoster");
 const learnerSections = document.querySelectorAll(".learner-only");
@@ -2414,6 +2926,242 @@ function createMathGeneratedQuestion(ageGroup, path, index) {
     return values[index % values.length];
   }
 
+  if (path === "numberSense") {
+    if (ageGroup === "early") {
+      const options = [
+        { skill: "Number Sense", title: "Counting", prompt: "What number comes next?", text: `${n}, ${n + 1}, ${n + 2}, ?`, answer: String(n + 3), hint: "Keep counting by 1." },
+        { skill: "Number Sense", title: "Compare", prompt: "Which number is larger?", text: `${n + 2} or ${n + 5}`, answer: String(n + 5), hint: "The larger number comes later when counting." },
+        { skill: "Number Sense", title: "Before", prompt: "What number comes before?", text: `${n + 4}`, answer: String(n + 3), hint: "Count back one." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "elementary") {
+      const value = 230 + index * 17;
+      const options = [
+        { skill: "Place Value", title: "Tens place", prompt: "What digit is in the tens place?", text: String(value), answer: String(Math.floor(value / 10) % 10), hint: "The tens place is the second digit from the right." },
+        { skill: "Rounding", title: "Nearest ten", prompt: "Round to the nearest ten.", text: String(value), answer: String(Math.round(value / 10) * 10), hint: "Use the ones digit to decide." },
+        { skill: "Number Sense", title: "Expanded form", prompt: "What is the value of the hundreds digit?", text: String(value), answer: String(Math.floor(value / 100) * 100), hint: "The hundreds digit tells how many hundreds." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "middle") {
+      const options = [
+        { skill: "Integers", title: "Absolute value", prompt: "Find the absolute value.", text: `|-${n + 4}|`, answer: String(n + 4), hint: "Absolute value is distance from zero." },
+        { skill: "Integers", title: "Order integers", prompt: "Which is greatest?", text: `-${n}, ${n - 3}, 0`, answer: String(n - 3), hint: "Positive numbers are greater than zero and negatives." },
+        { skill: "Number Sense", title: "Prime check", prompt: "Is this number prime? yes/no", text: "17", answer: "yes", hint: "17 has only 1 and itself as factors." }
+      ];
+      return options[index % options.length];
+    }
+
+    const options = [
+      { skill: "Scientific Notation", title: "Scientific notation", prompt: "Write as a regular number.", text: `${n} x 10^3`, answer: String(n * 1000), hint: "Move the decimal 3 places right." },
+      { skill: "Number Sense", title: "Square root", prompt: "Find the square root.", text: String((n + 2) * (n + 2)), answer: String(n + 2), hint: "Find the number multiplied by itself." },
+      { skill: "Number Sense", title: "Estimate", prompt: "Estimate to the nearest hundred.", text: String(1040 + index * 83), answer: String(Math.round((1040 + index * 83) / 100) * 100), hint: "Round to the closest hundred." }
+    ];
+    return options[index % options.length];
+  }
+
+  if (path === "decimals") {
+    const a = ((index % 9) + 1) / 10;
+    const b = (((index + 3) % 8) + 1) / 10;
+
+    if (ageGroup === "early") {
+      const larger = Math.max(a, b).toFixed(1);
+      return { skill: "Decimals", title: "Compare tenths", prompt: "Which decimal is larger?", text: `${a.toFixed(1)} or ${b.toFixed(1)}`, answer: larger, hint: "Compare the tenths digits." };
+    }
+
+    if (ageGroup === "elementary") {
+      const options = [
+        { skill: "Decimals", title: "Add decimals", prompt: "Add.", text: `${a.toFixed(1)} + ${b.toFixed(1)} = ?`, answer: (a + b).toFixed(1), hint: "Line up the decimal points." },
+        { skill: "Decimals", title: "Subtract decimals", prompt: "Subtract.", text: `${(a + 1).toFixed(1)} - ${b.toFixed(1)} = ?`, answer: (a + 1 - b).toFixed(1), hint: "Line up the decimal points." },
+        { skill: "Decimals", title: "Fraction to decimal", prompt: "Write as a decimal.", text: "1/2", answer: "0.5", hint: "One half is five tenths." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "middle") {
+      const whole = index + 2;
+      const options = [
+        { skill: "Decimals", title: "Multiply decimal", prompt: "Multiply.", text: `${whole} x 0.5`, answer: (whole * 0.5).toFixed(1), hint: "Multiplying by 0.5 means taking half." },
+        { skill: "Decimals", title: "Divide decimal", prompt: "Divide.", text: `${whole}.0 / 0.5`, answer: String(whole * 2), hint: "Dividing by one half doubles the number." },
+        { skill: "Decimals", title: "Percent to decimal", prompt: "Write as a decimal.", text: `${20 + index}%`, answer: ((20 + index) / 100).toFixed(2), hint: "Divide the percent by 100." }
+      ];
+      return options[index % options.length];
+    }
+
+    const options = [
+      { skill: "Decimals", title: "Evaluate decimal expression", prompt: "Evaluate.", text: `${n}.5 + ${n}.25`, answer: (n + 0.5 + n + 0.25).toFixed(2), hint: "Add whole numbers, then decimals." },
+      { skill: "Decimals", title: "Scientific decimal", prompt: "Write as a decimal.", text: `${n} x 10^-2`, answer: (n / 100).toFixed(2), hint: "Move the decimal 2 places left." },
+      { skill: "Decimals", title: "Solve decimal equation", prompt: "Solve for x.", text: `x + 0.75 = ${(n + 0.75).toFixed(2)}`, answer: String(n), hint: "Subtract 0.75 from both sides." }
+    ];
+    return options[index % options.length];
+  }
+
+  if (path === "percents") {
+    const base = 40 + index * 10;
+    const percent = [10, 20, 25, 50][index % 4];
+    const amount = base * percent / 100;
+
+    if (ageGroup === "early") {
+      return { skill: "Percents", title: "Half", prompt: "50% means what?", text: "50%", answer: "half", hint: "50% is one half." };
+    }
+
+    if (ageGroup === "elementary") {
+      return { skill: "Percents", title: "Percent of number", prompt: `Find ${percent}% of ${base}.`, text: `${percent}% of ${base}`, answer: String(amount), hint: "Change the percent to a fraction or decimal." };
+    }
+
+    if (ageGroup === "middle") {
+      const options = [
+        { skill: "Percents", title: "Discount", prompt: "Find the sale price.", text: `${base} with ${percent}% off`, answer: String(base - amount), hint: "Subtract the discount from the original price." },
+        { skill: "Percents", title: "Tip", prompt: "Find a 20% tip.", text: `$${base}`, answer: String(base * 0.2), hint: "20% is one fifth." },
+        { skill: "Percents", title: "Percent change", prompt: "Find percent increase.", text: `${base} to ${base + amount}`, answer: `${percent}%`, hint: "Increase divided by original equals percent change." }
+      ];
+      return options[index % options.length];
+    }
+
+    const options = [
+      { skill: "Percents", title: "Compound growth", prompt: "After 10% growth, what is the new value?", text: String(base), answer: String(base * 1.1), hint: "Multiply by 1.10." },
+      { skill: "Percents", title: "Reverse percent", prompt: "What original number has 25% equal to this?", text: String(amount), answer: String(amount / 0.25), hint: "Divide by 0.25." },
+      { skill: "Percents", title: "Percent equation", prompt: "Solve for x.", text: `20% of x = ${base / 5}`, answer: String(base), hint: "20% is 0.2, so divide by 0.2." }
+    ];
+    return options[index % options.length];
+  }
+
+  if (path === "ratios") {
+    const scale = index + 2;
+
+    if (ageGroup === "early") {
+      return { skill: "Ratios", title: "Equal groups", prompt: "How many total?", text: `${scale} groups of 2`, answer: String(scale * 2), hint: "Add 2 for each group." };
+    }
+
+    if (ageGroup === "elementary") {
+      const options = [
+        { skill: "Ratios", title: "Simplify ratio", prompt: "Simplify.", text: `${scale * 2}:${scale * 3}`, answer: "2:3", hint: "Divide both parts by the same number." },
+        { skill: "Rates", title: "Unit rate", prompt: "Find miles per hour.", text: `${scale * 30} miles in ${scale} hours`, answer: "30", hint: "Divide miles by hours." },
+        { skill: "Ratios", title: "Scale up", prompt: "Scale 2:5 by 3.", text: "2:5", answer: "6:15", hint: "Multiply both parts by 3." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "middle") {
+      const options = [
+        { skill: "Proportions", title: "Solve proportion", prompt: "Solve for x.", text: `3/4 = x/${(scale + 1) * 4}`, answer: String((scale + 1) * 3), hint: "Scale 4 to the denominator, then scale 3 the same way." },
+        { skill: "Unit Rates", title: "Price per item", prompt: "Find price per item.", text: `$${scale * 6} for ${scale} items`, answer: "6", hint: "Divide total price by number of items." },
+        { skill: "Ratios", title: "Part to whole", prompt: "What fraction is blue?", text: `${scale} blue, ${scale * 2} red`, answer: "1/3", hint: "Blue is one part out of three equal parts." }
+      ];
+      return options[index % options.length];
+    }
+
+    const options = [
+      { skill: "Proportions", title: "Direct variation", prompt: "Find k if y = kx.", text: `x=${scale}, y=${scale * 7}`, answer: "7", hint: "Divide y by x." },
+      { skill: "Rates", title: "Speed", prompt: "Find average speed.", text: `${scale * 45} miles in ${scale} hours`, answer: "45", hint: "Distance divided by time." },
+      { skill: "Ratios", title: "Golden ratio estimate", prompt: "Round 13/8 to two decimals.", text: "13/8", answer: "1.63", hint: "Divide 13 by 8." }
+    ];
+    return options[index % options.length];
+  }
+
+  if (path === "measurement") {
+    if (ageGroup === "early") {
+      const options = [
+        { skill: "Measurement", title: "Time", prompt: "How many minutes are in 1 hour?", text: "1 hour", answer: "60", hint: "One hour has 60 minutes." },
+        { skill: "Measurement", title: "Money", prompt: "How many cents is one quarter?", text: "quarter", answer: "25", hint: "A quarter is 25 cents." },
+        { skill: "Measurement", title: "Length", prompt: "Which is longer?", text: "foot or inch", answer: "foot", hint: "A foot has 12 inches." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "elementary") {
+      const options = [
+        { skill: "Measurement", title: "Feet to inches", prompt: "Convert to inches.", text: `${n} feet`, answer: String(n * 12), hint: "Each foot has 12 inches." },
+        { skill: "Measurement", title: "Hours to minutes", prompt: "Convert to minutes.", text: `${n} hours`, answer: String(n * 60), hint: "Each hour has 60 minutes." },
+        { skill: "Measurement", title: "Money", prompt: "How many cents?", text: `${n} quarters`, answer: String(n * 25), hint: "Each quarter is 25 cents." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "middle") {
+      const options = [
+        { skill: "Measurement", title: "Unit conversion", prompt: "Convert pounds to ounces.", text: `${n} lb`, answer: String(n * 16), hint: "Each pound has 16 ounces." },
+        { skill: "Measurement", title: "Capacity", prompt: "Convert cups to ounces.", text: `${n} cups`, answer: String(n * 8), hint: "Each cup has 8 fluid ounces." },
+        { skill: "Measurement", title: "Elapsed time", prompt: "How many minutes from 2:15 to 3:00?", text: "2:15 to 3:00", answer: "45", hint: "Count from 2:15 to 3:00." }
+      ];
+      return options[index % options.length];
+    }
+
+    const options = [
+      { skill: "Measurement", title: "Rate conversion", prompt: "Convert hours to seconds.", text: `${n} hours`, answer: String(n * 3600), hint: "One hour is 3600 seconds." },
+      { skill: "Measurement", title: "Density", prompt: "Find density.", text: `${n * 10} grams / ${n} mL`, answer: "10", hint: "Density is mass divided by volume." },
+      { skill: "Measurement", title: "Dimensional analysis", prompt: "Convert meters to centimeters.", text: `${n} meters`, answer: String(n * 100), hint: "One meter is 100 centimeters." }
+    ];
+    return options[index % options.length];
+  }
+
+  if (path === "wordProblems") {
+    if (ageGroup === "early") {
+      return { skill: "Word Problems", title: "Add story", prompt: "How many in all?", text: `${n} birds and 2 more birds`, answer: String(n + 2), hint: "In all means add." };
+    }
+
+    if (ageGroup === "elementary") {
+      const options = [
+        { skill: "Word Problems", title: "Equal groups", prompt: "How many total apples?", text: `${n} bags with 4 apples each`, answer: String(n * 4), hint: "Equal groups mean multiply." },
+        { skill: "Word Problems", title: "Left over", prompt: "How many remain?", text: `${n * 5} pencils, ${n + 3} used`, answer: String(n * 5 - n - 3), hint: "Remaining means subtract." },
+        { skill: "Word Problems", title: "Share equally", prompt: "How many per group?", text: `${n * 6} stickers shared by ${n} kids`, answer: "6", hint: "Sharing equally means divide." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "middle") {
+      const options = [
+        { skill: "Word Problems", title: "Percent story", prompt: "How many points did the score increase?", text: `${n * 10} points increased by 20%`, answer: String(n * 2), hint: "20% is one fifth." },
+        { skill: "Word Problems", title: "Ratio story", prompt: "How many red beads?", text: `red:blue is 3:2, blue is ${n * 2}`, answer: String(n * 3), hint: "Scale both ratio parts by the same factor." },
+        { skill: "Word Problems", title: "Equation story", prompt: "Find the number.", text: `Twice a number plus 4 is ${2 * n + 4}`, answer: String(n), hint: "Undo plus 4, then divide by 2." }
+      ];
+      return options[index % options.length];
+    }
+
+    const options = [
+      { skill: "Word Problems", title: "Linear model", prompt: "Find total cost.", text: `$${n} fee plus $3 per ticket for 4 tickets`, answer: String(n + 12), hint: "Fixed fee plus rate times number." },
+      { skill: "Word Problems", title: "Mixture", prompt: "Find total amount.", text: `${n} liters plus ${n + 2} liters`, answer: String(2 * n + 2), hint: "Add the amounts." },
+      { skill: "Word Problems", title: "Break-even", prompt: "Solve for x.", text: `5x = ${n * 5}`, answer: String(n), hint: "Divide both sides by 5." }
+    ];
+    return options[index % options.length];
+  }
+
+  if (path === "dataGraphs") {
+    const values = [n, n + 2, n + 4, n + 6];
+
+    if (ageGroup === "early") {
+      return { skill: "Data", title: "Count votes", prompt: "How many total votes?", text: `${n} yes and 2 no`, answer: String(n + 2), hint: "Add both groups." };
+    }
+
+    if (ageGroup === "elementary") {
+      const options = [
+        { skill: "Data", title: "Mean", prompt: "Find the mean.", text: values.slice(0, 3).join(", "), answer: String(n + 2), hint: "Add the values and divide by 3." },
+        { skill: "Data", title: "Range", prompt: "Find the range.", text: values.join(", "), answer: "6", hint: "Largest minus smallest." },
+        { skill: "Data", title: "Mode", prompt: "Find the mode.", text: `${n}, ${n + 1}, ${n + 1}, ${n + 3}`, answer: String(n + 1), hint: "Mode appears most often." }
+      ];
+      return options[index % options.length];
+    }
+
+    if (ageGroup === "middle") {
+      const options = [
+        { skill: "Data", title: "Median", prompt: "Find the median.", text: values.join(", "), answer: String(n + 3), hint: "Average the two middle values." },
+        { skill: "Probability", title: "Simple probability", prompt: "Probability of red?", text: `${n} red, ${n} blue`, answer: "1/2", hint: "Red outcomes over total outcomes." },
+        { skill: "Data", title: "Mean with outlier", prompt: "Find the mean.", text: `${n}, ${n}, ${n + 9}`, answer: String(n + 3), hint: "Add and divide by 3." }
+      ];
+      return options[index % options.length];
+    }
+
+    const options = [
+      { skill: "Data", title: "Weighted average", prompt: "Find the weighted average.", text: `two ${n}s and one ${n + 9}`, answer: String(n + 3), hint: "Add all weighted values and divide by total count." },
+      { skill: "Probability", title: "Complement", prompt: "If P(rain)=0.3, find P(no rain).", text: "P(rain)=0.3", answer: "0.7", hint: "Complement is 1 minus the probability." },
+      { skill: "Data", title: "Slope from table", prompt: "Find the rate of change.", text: `(1, ${n}) and (3, ${n + 8})`, answer: "4", hint: "Change in y divided by change in x." }
+    ];
+    return options[index % options.length];
+  }
+
   if (path === "shapes") {
     if (ageGroup === "early") {
       const shapes = [
@@ -2563,6 +3311,28 @@ function createEnglishGeneratedQuestion(ageGroup, path, index) {
     return { skill: "Vocabulary", title: "Academic vocabulary", prompt: "Choose the closest meaning.", text, answer, hint: "Use the root or context clue." };
   }
 
+  if (path === "vocabulary") {
+    const vocabularySets = {
+      early: [["big", "large"], ["small", "tiny"], ["happy", "glad"], ["sad", "unhappy"], ["fast", "quick"], ["cold", "chilly"], ["hot", "warm"], ["start", "begin"], ["end", "finish"], ["look", "see"]],
+      elementary: [["ancient", "veryold"], ["brave", "courageous"], ["silent", "quiet"], ["rapid", "fast"], ["assist", "help"], ["select", "choose"], ["difficult", "hard"], ["simple", "easy"], ["observe", "watch"], ["repair", "fix"]],
+      middle: [["contrast", "difference"], ["analyze", "examine"], ["evidence", "proof"], ["summarize", "shorten"], ["predict", "guess"], ["significant", "important"], ["infer", "conclude"], ["frequent", "often"], ["scarce", "rare"], ["expand", "grow"]],
+      teen: [["ambiguous", "unclear"], ["concise", "brief"], ["credible", "believable"], ["inevitable", "unavoidable"], ["mitigate", "reduce"], ["advocate", "support"], ["scrutinize", "examine"], ["subtle", "slight"], ["robust", "strong"], ["coherent", "logical"]]
+    };
+    const [text, answer] = vocabularySets[ageGroup][index % 10];
+    return { skill: "Vocabulary", title: "Word meaning", prompt: "Choose the closest meaning.", text, answer, hint: "Use context, roots, or related words." };
+  }
+
+  if (path === "spelling") {
+    const spellingSets = {
+      early: [["cat", "cat"], ["sun", "sun"], ["fish", "fish"], ["ship", "ship"], ["cake", "cake"], ["rain", "rain"], ["tree", "tree"], ["book", "book"], ["ball", "ball"], ["home", "home"]],
+      elementary: [["running or runing", "running"], ["happier or happyer", "happier"], ["babies or babys", "babies"], ["planned or planed", "planned"], ["careful or carful", "careful"], ["because or becuz", "because"], ["friend or freind", "friend"], ["receive or recieve", "receive"], ["piece or peice", "piece"], ["citys or cities", "cities"]],
+      middle: [["necessary or neccessary", "necessary"], ["separate or seperate", "separate"], ["definitely or definately", "definitely"], ["occurred or occured", "occurred"], ["beginning or begining", "beginning"], ["successful or succesful", "successful"], ["argument or arguement", "argument"], ["grammar or grammer", "grammar"], ["parallel or paralel", "parallel"], ["calendar or calender", "calendar"]],
+      teen: [["accommodate or accomodate", "accommodate"], ["conscience or consience", "conscience"], ["privilege or priviledge", "privilege"], ["maintenance or maintainance", "maintenance"], ["pronunciation or pronounciation", "pronunciation"], ["supersede or supercede", "supersede"], ["questionnaire or questionaire", "questionnaire"], ["entrepreneur or entreprenuer", "entrepreneur"], ["rhythm or rythm", "rhythm"], ["liaison or liason", "liaison"]]
+    };
+    const [text, answer] = spellingSets[ageGroup][index % 10];
+    return { skill: "Spelling", title: "Correct spelling", prompt: "Choose the correctly spelled word.", text, answer, hint: "Look for the standard spelling pattern." };
+  }
+
   if (path === "reading") {
     const readingSets = {
       early: [
@@ -2586,6 +3356,17 @@ function createEnglishGeneratedQuestion(ageGroup, path, index) {
     return { skill: "Reading", title: "Comprehension", prompt, text, answer, hint: "Use the sentence details." };
   }
 
+  if (path === "comprehension") {
+    const comprehensionSets = {
+      early: [["The dog ran to the ball.", "What did the dog run to?", "ball"], ["Mia put on boots because it rained.", "Why did Mia wear boots?", "rain"], ["The bird built a nest.", "What did the bird build?", "nest"], ["Sam ate lunch after math.", "What happened first?", "math"], ["The red kite flew high.", "What color was the kite?", "red"], ["Ana smiled after winning.", "How did Ana feel?", "happy"], ["The fish swam in a pond.", "Where was the fish?", "pond"], ["The bell rang, so class began.", "What caused class to begin?", "bell"], ["The baby slept quietly.", "What did the baby do?", "slept"], ["The sun set and it got dark.", "What happened after sunset?", "dark"]],
+      elementary: [["Plants need water and sunlight.", "What is the main idea?", "plants"], ["Leo studied, so his score improved.", "Why did Leo improve?", "studied"], ["A jacket was needed because the air was chilly.", "What does chilly mean?", "cold"], ["Nora returned the lost wallet.", "What trait is shown?", "honest"], ["The team practiced daily and won.", "What caused the win?", "practice"], ["Owls hunt at night.", "When do owls hunt?", "night"], ["The author explains how bees help plants.", "Author's purpose?", "inform"], ["Rain fell, and the field closed.", "What caused the field to close?", "rain"], ["The small seed became a plant.", "What changed?", "seed"], ["Lina kept trying after mistakes.", "Theme?", "perseverance"]],
+      middle: [["The narrator says I packed my bag.", "Point of view?", "firstperson"], ["However, the plan failed.", "What does however signal?", "contrast"], ["Evidence supports a claim.", "What supports a claim?", "evidence"], ["Ari gave away his lunch to help.", "What trait is shown?", "generous"], ["The text compares two inventions.", "Text structure?", "comparecontrast"], ["Because the roads froze, school closed.", "What caused school to close?", "frozenroads"], ["The repeated storm image creates a worried mood.", "What mood?", "worried"], ["A paragraph begins with a broad claim, then proof.", "What comes after claim?", "proof"], ["The character learns to ask for help.", "Theme?", "humility"], ["Numbers in the article support the claim.", "What type of evidence?", "statistics"]],
+      teen: [["Ethos relies on credibility.", "Which appeal is credibility?", "ethos"], ["The author's skeptical tone shows doubt.", "What does skeptical mean?", "doubtful"], ["A counterclaim presents the opposing view.", "What does counterclaim show?", "opposingview"], ["The passage moves from problem to solution.", "Text structure?", "problemsolution"], ["The speaker uses statistics to prove the point.", "Which appeal uses logic?", "logos"], ["The phrase creates a hopeful tone.", "What is the tone?", "hopeful"], ["An unreliable narrator may mislead readers.", "What may the narrator do?", "mislead"], ["The conclusion synthesizes ideas.", "What does synthesize mean?", "combine"], ["Pathos appeals to feelings.", "Which appeal uses emotion?", "pathos"], ["A central idea controls the whole text.", "What controls the text?", "centralidea"]]
+    };
+    const [text, prompt, answer] = comprehensionSets[ageGroup][index % 10];
+    return { skill: "Comprehension", title: "Reading thinking", prompt, text, answer, hint: "Use evidence from the text." };
+  }
+
   if (path === "grammar") {
     const grammarSets = {
       early: [["mom or run", "Which is a person?", "mom"], ["park or jump", "Which is a place?", "park"], ["hop or blue", "Which is an action?", "hop"], ["soft, run, dog", "Which word describes?", "soft"], [". or ?", "Which mark ends a telling sentence?", "."], ["yes or no", "Should a name start with a capital?", "yes"], ["cup or sing", "Which is a thing?", "cup"], ["run or red", "Which is an action?", "run"], ["ball or jump", "Which is a noun?", "ball"], ["big, cat, run", "Which describes?", "big"]],
@@ -2595,6 +3376,39 @@ function createEnglishGeneratedQuestion(ageGroup, path, index) {
     };
     const [text, prompt, answer] = grammarSets[ageGroup][index % 10];
     return { skill: "Grammar", title: "Grammar check", prompt, text, answer, hint: "Look at how the word or sentence is working." };
+  }
+
+  if (path === "partsOfSpeech") {
+    const partSets = {
+      early: [["The puppy runs.", "Find the noun.", "puppy"], ["Sam jumps.", "Find the verb.", "jumps"], ["The red ball rolls.", "Find the describing word.", "red"], ["Mia sings softly.", "Find the action word.", "sings"], ["The big dog barks.", "Find the adjective.", "big"], ["The cat sleeps.", "Find the noun.", "cat"], ["Ben reads.", "Find the verb.", "reads"], ["The blue kite flies.", "Find the adjective.", "blue"], ["She runs.", "Find the pronoun.", "she"], ["The bird is small.", "Find the adjective.", "small"]],
+      elementary: [["The river flows quickly.", "Find the adverb.", "quickly"], ["Lena and Max played.", "Find the conjunction.", "and"], ["The book is under the desk.", "Find the preposition.", "under"], ["He carried the box.", "Find the pronoun.", "he"], ["The golden leaf fell.", "Find the adjective.", "golden"], ["Sara paints carefully.", "Find the verb.", "paints"], ["The quiet room echoed.", "Find the noun.", "room"], ["We ran after lunch.", "Find the pronoun.", "we"], ["The dog barked loudly.", "Find the adverb.", "loudly"], ["A cat slept beside me.", "Find the preposition.", "beside"]],
+      middle: [["Although it rained, we played.", "Find the subordinating conjunction.", "although"], ["The team celebrated loudly.", "Find the adverb.", "loudly"], ["Several students volunteered.", "Find the adjective.", "several"], ["The book on the shelf is mine.", "Find the preposition.", "on"], ["They finished the project.", "Find the pronoun.", "they"], ["Running daily builds strength.", "Running is what part of speech?", "gerund"], ["The plan was successful.", "Find the adjective.", "successful"], ["Beside the river, birds sang.", "Find the preposition.", "beside"], ["Neither answer worked.", "Find the determiner.", "neither"], ["The class discussed history.", "Find the noun.", "history"]],
+      teen: [["The proposal seemed feasible.", "Find the predicate adjective.", "feasible"], ["Analyzing evidence takes practice.", "Analyzing is what part of speech?", "gerund"], ["The policy that passed was controversial.", "Find the relative pronoun.", "that"], ["The speaker argued persuasively.", "Find the adverb.", "persuasively"], ["The carefully revised essay improved.", "Find the participle.", "revised"], ["Despite delays, work continued.", "Find the preposition.", "despite"], ["The result was unexpectedly strong.", "Find the adverb.", "unexpectedly"], ["Those are reliable sources.", "Find the demonstrative pronoun.", "those"], ["The committee approved the final draft.", "Find the direct object.", "draft"], ["The author writes with clarity.", "Find the noun.", "clarity"]]
+    };
+    const [text, prompt, answer] = partSets[ageGroup][index % 10];
+    return { skill: "Parts of Speech", title: "Identify the part", prompt, text, answer, hint: "Ask what job the word is doing." };
+  }
+
+  if (path === "punctuation") {
+    const punctuationSets = {
+      early: [["Can we play", "Which end mark?", "?"], ["I like dogs", "Which end mark?", "."], ["Stop", "Which end mark shows strong feeling?", "!"], ["Where is my hat", "Which end mark?", "?"], ["The sun is hot", "Which end mark?", "."], ["Wow", "Which end mark shows excitement?", "!"], ["Do you see it", "Which end mark?", "?"], ["I can run", "Which end mark?", "."], ["Look out", "Which end mark?", "!"], ["Is it raining", "Which end mark?", "?"]],
+      elementary: [["After lunch we read.", "Which phrase needs a comma after it?", "afterlunch"], ["I packed pencils paper and glue.", "What punctuation separates list items?", "comma"], ["The dog bone", "Write possessive phrase.", "dog'sbone"], ["Mom said hello.", "What marks spoken words?", "quotationmarks"], ["Yes I finished.", "Which word needs a comma after it?", "yes"], ["The cats toy", "Write possessive phrase.", "cat'stoy"], ["First we washed hands.", "Which word needs a comma after it?", "first"], ["red blue and green", "What separates list items?", "commas"], ["Where are you", "Which end mark?", "?"], ["I won the game", "Which end mark can show excitement?", "!"]],
+      middle: [["Before school we practiced.", "Which phrase needs a comma?", "beforeschool"], ["I studied; I passed.", "What punctuation joins the clauses?", "semicolon"], ["The book, which was long, was useful.", "What marks extra information?", "commas"], ["She asked, Are you ready?", "What marks direct speech?", "quotationmarks"], ["its or it's", "Choose the contraction for it is.", "it's"], ["The teams scores improved.", "Write possessive.", "team'sscores"], ["However the answer changed.", "What word needs a comma after it?", "however"], ["Bring pencils, paper, and folders.", "What comma before and is often used?", "oxfordcomma"], ["The title was The River.", "What can mark a short story title?", "quotationmarks"], ["I need one thing: focus.", "What punctuation introduces the explanation?", "colon"]],
+      teen: [["The evidence is strong; however, more research is needed.", "What joins related clauses?", "semicolon"], ["The claim was clear: practice matters.", "What introduces the explanation?", "colon"], ["The author writes, We must act now.", "What marks exact words?", "quotationmarks"], ["The policy--though costly--worked.", "What punctuation can set off an interruption?", "dash"], ["Students, teachers, and parents agreed.", "What comma appears before and?", "oxfordcomma"], ["The study's results changed minds.", "What punctuation shows possession?", "apostrophe"], ["If the plan fails, revise it.", "What separates the introductory clause?", "comma"], ["The answer is simple: read carefully.", "What punctuation comes before explanation?", "colon"], ["She was tired; nevertheless, she finished.", "What punctuation before nevertheless?", "semicolon"], ["in other words", "This phrase needs what after it?", "comma"]]
+    };
+    const [text, prompt, answer] = punctuationSets[ageGroup][index % 10];
+    return { skill: "Punctuation", title: "Punctuation check", prompt, text, answer, hint: "Look at how the sentence is organized." };
+  }
+
+  if (path === "sentenceStructure") {
+    const sentenceSets = {
+      early: [["The cat sleeps. / Because the cat", "Choose the complete sentence.", "thecatsleeps"], ["Runs fast. / The dog runs fast.", "Choose the complete sentence.", "thedogrunsfast"], ["I see a bird. / See bird I.", "Choose the clear sentence.", "iseeabird"], ["The sun is bright. / Bright sun", "Choose the complete sentence.", "thesunisbright"], ["We play. / Play we.", "Choose the clear sentence.", "weplay"], ["The fish swims. / Fish the swims.", "Choose the sentence.", "thefishswims"], ["Mia reads. / Reads Mia book.", "Choose the complete sentence.", "miareads"], ["The bell rang. / Rang bell the.", "Choose the sentence.", "thebellrang"], ["I like math. / Like math.", "Choose the complete sentence.", "ilikemath"], ["The dog barked. / Barked dog.", "Choose the complete sentence.", "thedogbarked"]],
+      elementary: [["The puppy sleeps.", "Find the subject.", "puppy"], ["The tall tree swayed.", "Find the predicate.", "swayed"], ["Because it rained.", "Fragment or sentence?", "fragment"], ["I ran home I was late.", "What error?", "runon"], ["The bird sang loudly.", "Find the predicate.", "sangloudly"], ["After school, we played.", "What kind of phrase begins the sentence?", "introductory"], ["The class cheered.", "Complete or fragment?", "complete"], ["When the bell rang.", "Fragment or sentence?", "fragment"], ["Lena painted a picture.", "Find the subject.", "lena"], ["The test was easy.", "Find the predicate.", "waseasy"]],
+      middle: [["Although it was late, we finished.", "Dependent clause?", "althoughitwaslate"], ["The answer changed because new evidence appeared.", "Independent clause?", "theanswerchanged"], ["I wanted to go, but I stayed.", "What joins the clauses?", "but"], ["Running through the park.", "Fragment or sentence?", "fragment"], ["The team practiced, and the score improved.", "Compound or simple?", "compound"], ["Because the road closed, we turned back.", "What clause starts the sentence?", "dependent"], ["The book that I borrowed was helpful.", "What clause describes book?", "thatiborrowed"], ["She studied hard; she passed.", "What joins the sentences?", "semicolon"], ["The storm ended, so we left.", "What conjunction shows result?", "so"], ["To improve the essay, revise the evidence.", "What phrase starts the sentence?", "infinitive"]],
+      teen: [["Although the data was limited, the claim was persuasive.", "Name the dependent clause.", "althoughthedatawaslimited"], ["The argument is clear, but the evidence is weak.", "Sentence type?", "compound"], ["Because the source was credible, the evidence mattered.", "What does the first clause show?", "cause"], ["The proposal, which was expensive, passed.", "What clause is nonessential?", "whichwasexpensive"], ["Analyzing the graph, she noticed a trend.", "What phrase begins the sentence?", "participial"], ["The thesis is strong; the support is limited.", "What punctuation joins the clauses?", "semicolon"], ["If costs rise, demand may fall.", "What kind of clause starts it?", "dependent"], ["The article explains how policy changed.", "What clause follows explains?", "nounclause"], ["Clear evidence strengthens claims.", "Simple or compound?", "simple"], ["The speaker paused, then answered.", "What does then show?", "sequence"]]
+    };
+    const [text, prompt, answer] = sentenceSets[ageGroup][index % 10];
+    return { skill: "Sentence Structure", title: "Sentence check", prompt, text, answer, hint: "Look for complete thoughts and how clauses connect." };
   }
 
   const writingSets = {
@@ -2607,17 +3421,93 @@ function createEnglishGeneratedQuestion(ageGroup, path, index) {
   return { skill: "Writing", title: "Writing practice", prompt, text, answer, hint: "Choose the option that makes the writing clearer." };
 }
 
+function createFunGeneratedQuestion(ageGroup, path, index) {
+  if (path === "generalKnowledge") {
+    const sets = {
+      early: [["What do we use to tell time?", "clock"], ["What color do you get by mixing red and blue?", "purple"], ["How many days are in a week?", "7"], ["What do plants need to grow?", "water"], ["What season comes after winter?", "spring"]],
+      elementary: [["How many months are in a year?", "12"], ["What is the largest ocean?", "pacific"], ["Who invented the light bulb in many school lessons?", "edison"], ["What gas do humans breathe in?", "oxygen"], ["How many sides does a stop sign have?", "8"]],
+      middle: [["What is the capital of the United States?", "washingtondc"], ["What organ pumps blood?", "heart"], ["What is the process plants use to make food?", "photosynthesis"], ["What is the freezing point of water in Celsius?", "0"], ["What is the closest star to Earth?", "sun"]],
+      teen: [["What document begins with We the People?", "constitution"], ["What force keeps planets in orbit?", "gravity"], ["What is the study of life called?", "biology"], ["What is the largest planet?", "jupiter"], ["What is the chemical symbol for water?", "h2o"]]
+    };
+    const [text, answer] = sets[ageGroup][index % sets[ageGroup].length];
+    return { skill: "General Knowledge", title: "Knowledge check", prompt: "Answer the question.", text, answer, hint: "Think about everyday knowledge and school facts." };
+  }
+
+  if (path === "flags") {
+    const sets = {
+      early: [["Which country flag has red and white stripes with white stars on blue?", "usa"], ["Which country uses a red maple leaf?", "canada"], ["Which country flag has a red circle on white?", "japan"], ["Which country flag is green, white, and orange vertical stripes?", "ireland"], ["Which country has a union jack flag?", "unitedkingdom"]],
+      elementary: [["Which country has a green, white, and red vertical tricolor?", "italy"], ["Which country has black, red, and yellow horizontal stripes?", "germany"], ["Which country has blue and white stripes with a sun?", "argentina"], ["Which country has a red flag with yellow stars?", "china"], ["Which country has a blue cross on white?", "finland"]],
+      middle: [["Which country has a red flag with a white crescent and star?", "turkey"], ["Which country has a green flag with a yellow diamond?", "brazil"], ["Which country has a red and white flag with a maple leaf?", "canada"], ["Which country has a blue flag with yellow stars in a circle?", "europeanunion"], ["Which country has saffron, white, and green with a blue wheel?", "india"]],
+      teen: [["Which country flag has a cedar tree?", "lebanon"], ["Which country has a red flag with a white cross?", "switzerland"], ["Which country flag has a dragon?", "wales"], ["Which country flag has a red sun with rays?", "northmacedonia"], ["Which country flag has a blue Star of David?", "israel"]]
+    };
+    const [text, answer] = sets[ageGroup][index % sets[ageGroup].length];
+    return { skill: "Country Flags", title: "Flag check", prompt: "Identify the country or region.", text, answer, hint: "Use the colors and symbols as clues." };
+  }
+
+  if (path === "geography") {
+    const sets = {
+      early: [["What planet do we live on?", "earth"], ["What is a very large body of salt water called?", "ocean"], ["What do we call land with water all around it?", "island"], ["What is frozen water called?", "ice"], ["What shines in the daytime sky?", "sun"]],
+      elementary: [["How many continents are there?", "7"], ["What is the largest continent?", "asia"], ["What ocean is west of California?", "pacific"], ["What country is directly north of the United States?", "canada"], ["What is the capital of France?", "paris"]],
+      middle: [["What line divides Earth into north and south halves?", "equator"], ["What is the longest river often taught in school?", "nile"], ["What desert is the largest hot desert?", "sahara"], ["What mountain range includes Mount Everest?", "himalayas"], ["What is the capital of Mexico?", "mexicocity"]],
+      teen: [["What imaginary line is at 0 degrees longitude?", "primemeridian"], ["What is the capital of Japan?", "tokyo"], ["What sea lies between Europe and Africa?", "mediterranean"], ["What country has the city of Cairo?", "egypt"], ["What continent is Chile in?", "southamerica"]]
+    };
+    const [text, answer] = sets[ageGroup][index % sets[ageGroup].length];
+    return { skill: "Geography", title: "Map check", prompt: "Answer the geography question.", text, answer, hint: "Think about maps, places, and landforms." };
+  }
+
+  if (path === "animalsScience") {
+    const sets = {
+      early: [["What animal says moo?", "cow"], ["What animal has a long trunk?", "elephant"], ["What do bees make?", "honey"], ["What do fish use to breathe underwater?", "gills"], ["What planet is known as the red planet?", "mars"]],
+      elementary: [["What animal is the fastest land animal?", "cheetah"], ["What do caterpillars become?", "butterflies"], ["What force pulls things down?", "gravity"], ["What part of a plant takes in water?", "roots"], ["What weather tool measures temperature?", "thermometer"]],
+      middle: [["What gas do plants take in?", "carbondioxide"], ["What is the center of an atom called?", "nucleus"], ["What animal group has feathers?", "birds"], ["What is water changing to vapor called?", "evaporation"], ["What body system controls movement and thought?", "nervous"]],
+      teen: [["What molecule carries genetic instructions?", "dna"], ["What is the basic unit of life?", "cell"], ["What process releases energy from food in cells?", "respiration"], ["What type of energy comes from motion?", "kinetic"], ["What organelle makes energy for the cell?", "mitochondria"]]
+    };
+    const [text, answer] = sets[ageGroup][index % sets[ageGroup].length];
+    return { skill: "Animals & Science", title: "Science check", prompt: "Answer the question.", text, answer, hint: "Use what you know about animals, nature, and science." };
+  }
+
+  const sets = {
+    early: [["What comes next?", "red, blue, red, blue, ?", "red"], ["Which one is different?", "cat, dog, car", "car"], ["What comes next?", "1, 2, 3, ?", "4"], ["Which is the odd one out?", "apple, banana, chair", "chair"], ["What comes next?", "A, B, A, B, ?", "a"]],
+    elementary: [["What comes next?", "2, 4, 6, 8, ?", "10"], ["Which word does not belong?", "circle, square, sandwich", "sandwich"], ["What comes next?", "Monday, Tuesday, Wednesday, ?", "thursday"], ["If all bloops are blue and this is a bloop, what color is it?", "bloop", "blue"], ["What comes next?", "5, 10, 15, ?", "20"]],
+    middle: [["What comes next?", "3, 6, 12, 24, ?", "48"], ["Which number is the outlier?", "4, 8, 12, 17, 16", "17"], ["If A>B and B>C, which is greatest?", "A, B, C", "a"], ["What comes next?", "1, 4, 9, 16, ?", "25"], ["Decode: A=1, B=2. What is C?", "C", "3"]],
+    teen: [["What comes next?", "2, 3, 5, 8, 13, ?", "21"], ["If no squares are circles, can a square be a circle? yes/no", "logic", "no"], ["What comes next?", "1, 1, 2, 3, 5, ?", "8"], ["If x implies y and x is true, what is true?", "x -> y", "y"], ["What comes next?", "64, 32, 16, 8, ?", "4"]]
+  };
+  const [prompt, text, answer] = sets[ageGroup][index % sets[ageGroup].length];
+  return { skill: "Logic Puzzles", title: "Brain teaser", prompt, text, answer, hint: "Look for the pattern or rule." };
+}
+
 function getGeneratedQuestions(subject, ageGroup, path, count = 24) {
   return Array.from({ length: count }, (_item, index) => {
-    return subject === "math"
-      ? createMathGeneratedQuestion(ageGroup, path, index)
-      : createEnglishGeneratedQuestion(ageGroup, path, index);
+    if (subject === "math") {
+      return createMathGeneratedQuestion(ageGroup, path, index);
+    }
+
+    if (subject === "fun") {
+      return createFunGeneratedQuestion(ageGroup, path, index);
+    }
+
+    return createEnglishGeneratedQuestion(ageGroup, path, index);
   });
 }
 
 function getSubjectLevelQuestions(subject, ageGroup) {
   const topics = Object.keys(curriculumQuestionBank[subject]?.[ageGroup] || {});
   return mergeUniqueQuestions(topics.flatMap((path) => getLevelPathQuestions(subject, path, ageGroup)));
+}
+
+function getMixedMathQuestions(ageGroup) {
+  const mathPaths = ["facts", "numberSense", "decimals", "percents", "ratios", "measurement", "wordProblems", "dataGraphs", "shapes", "fractions", "algebra"];
+  const questions = mathPaths.flatMap((path) => {
+    const starterQuestions = curriculumQuestionBank.math?.[ageGroup]?.[path]
+      || pathQuestionBank.math?.[path]
+      || [];
+    const extraQuestions = supplementalCurriculumQuestionBank.math?.[ageGroup]?.[path] || [];
+    const generatedQuestions = getGeneratedQuestions("math", ageGroup, path);
+
+    return [...starterQuestions, ...extraQuestions, ...generatedQuestions];
+  });
+
+  return mergeUniqueQuestions(questions).slice(0, 80);
 }
 
 function getPlacementQuestionSet(subject, ageGroup) {
@@ -2631,6 +3521,10 @@ function getPlacementQuestionSet(subject, ageGroup) {
 }
 
 function getLevelPathQuestions(subject, path, ageGroup) {
+  if (subject === "math" && path === "facts") {
+    return getMixedMathQuestions(ageGroup);
+  }
+
   const starterQuestions = curriculumQuestionBank[subject]?.[ageGroup]?.[path]
     || pathQuestionBank[subject]?.[path]
     || [];
@@ -2697,17 +3591,27 @@ function getCurrentTrack() {
     const child = getCurrentChild();
     const parentQuestion = getParentQuestionById(appState.parentQuestionId) || getPendingParentQuestion(child);
     const subjectLabel = parentQuestion && parentQuestion.subject === "english" ? "English" : "Math";
+    const activeGroup = parentQuestion && parentQuestion.testGroupId
+      ? getChildParentQuestionGroups(parentQuestion.childId).find((group) => group.groupId === parentQuestion.testGroupId)
+      : null;
+    const groupPosition = activeGroup
+      ? activeGroup.answered.length + 1
+      : 1;
+    const groupPrompt = activeGroup
+      ? `${activeGroup.timedChallenge ? "Timed challenge" : "Challenge"} question ${groupPosition} of ${activeGroup.questions.length}`
+      : "";
     const question = parentQuestion
       ? {
-        title: "Parent check",
-        prompt: parentQuestion.prompt || `${subjectLabel} question from your parent`,
+        title: activeGroup && activeGroup.timedChallenge ? "Timed challenge" : "Parent check",
+        prompt: groupPrompt || parentQuestion.prompt || `${subjectLabel} question from your parent`,
         text: parentQuestion.question,
         answer: parentQuestion.answer,
         hint: parentQuestion.explanation || "Think through the question carefully, then compare with the correct answer.",
         explanation: parentQuestion.explanation || "",
         skill: "Parent check",
         difficulty: "medium",
-        parentQuestionId: parentQuestion.id
+        parentQuestionId: parentQuestion.id,
+        parentTestGroupId: parentQuestion.testGroupId || ""
       }
       : {
         title: "Parent check",
@@ -2807,8 +3711,10 @@ function getAnswerExplanation(question, submittedAnswer) {
 
 function renderTopicSelect() {
   const child = getCurrentChild();
+  const pendingGroups = getPendingParentQuestionGroups(child);
+  const groupedQuestionIds = new Set(pendingGroups.flatMap((group) => group.questions.map((question) => question.id)));
   const pendingTests = getChildParentQuestions(child && child.id)
-    .filter((question) => question.status === "pending");
+    .filter((question) => question.status === "pending" && !groupedQuestionIds.has(question.id));
   const subjectSkills = skills[appState.subject];
   const hasSelectedPath = subjectSkills.some((skill) => skill.key === appState.path);
 
@@ -2816,14 +3722,21 @@ function renderTopicSelect() {
     appState.path = null;
   }
 
-  const testOptions = pendingTests.length
+  const groupOptions = pendingGroups.map((group) => `
+    <option value="testgroup:${escapeHtml(group.groupId)}" ${appState.parentTestGroupId === group.groupId ? "selected" : ""}>
+      ${escapeHtml(`${group.timedChallenge ? "Timed " : ""}${getSubjectLabel(group.subject)} challenge: ${group.answered.length}/${group.questions.length} done`)}
+    </option>
+  `).join("");
+  const singleOptions = pendingTests.map((question, index) => `
+    <option value="test:${escapeHtml(question.id)}" ${appState.parentQuestionId === question.id ? "selected" : ""}>
+      ${escapeHtml(`${getSubjectLabel(question.subject)} test ${index + 1}: ${question.question}`)}
+    </option>
+  `).join("");
+  const testOptions = pendingGroups.length || pendingTests.length
     ? `
       <optgroup label="Tests">
-        ${pendingTests.map((question, index) => `
-          <option value="test:${escapeHtml(question.id)}" ${appState.parentQuestionId === question.id ? "selected" : ""}>
-            ${escapeHtml(`${getSubjectLabel(question.subject)} test ${index + 1}: ${question.question}`)}
-          </option>
-        `).join("")}
+        ${groupOptions}
+        ${singleOptions}
       </optgroup>
     `
     : "";
@@ -2841,13 +3754,17 @@ function renderTopicSelect() {
 
 function syncLearnerMode() {
   const child = getCurrentChild();
+  const parentGroupQuestion = appState.parentTestGroupId
+    ? getPendingParentQuestionInGroup(child, appState.parentTestGroupId)
+    : null;
   const parentQuestion = appState.parentQuestionId
     ? getParentQuestionById(appState.parentQuestionId)
-    : getPendingParentQuestion(child);
+    : parentGroupQuestion || getPendingParentQuestion(child);
 
   if (parentQuestion && parentQuestion.status === "pending" && appState.answered === 0) {
     appState.mode = "parent-check";
     appState.parentQuestionId = parentQuestion.id;
+    appState.parentTestGroupId = parentQuestion.testGroupId || appState.parentTestGroupId || null;
     appState.subject = parentQuestion.subject;
     return;
   }
@@ -2855,6 +3772,7 @@ function syncLearnerMode() {
   if (appState.mode === "parent-check" && (!parentQuestion || parentQuestion.status !== "pending")) {
     appState.mode = "practice";
     appState.parentQuestionId = null;
+    appState.parentTestGroupId = null;
   }
 
   const needsPlacement = child && !hasPlacementResult(child, appState.subject);
@@ -3239,6 +4157,62 @@ parentChildForm.addEventListener("submit", async (event) => {
   }
 });
 
+academyParentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(academyParentForm);
+  const name = String(formData.get("academyParentName") || "").trim();
+  const email = String(formData.get("academyParentEmail") || "").trim().toLowerCase();
+
+  if (!name || !email) {
+    authMessage.textContent = "Enter the parent's name and email.";
+    return;
+  }
+
+  try {
+    await createAcademyParentProfile({ name, email });
+    academyParentForm.reset();
+    authMessage.textContent = "Parent added. They can create their password from the parent login screen.";
+    renderParentDashboard();
+  } catch (error) {
+    authMessage.textContent = getDatabaseErrorMessage(error);
+  }
+});
+
+academyStudentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(academyStudentForm);
+  const parentId = String(formData.get("academyStudentParent") || "");
+  const firstName = String(formData.get("academyStudentFirstName") || "").trim();
+  const lastName = String(formData.get("academyStudentLastName") || "").trim();
+  const age = Number(formData.get("academyStudentAge") || 8);
+  const state = String(formData.get("academyStudentState") || "NA").trim().toUpperCase().slice(0, 2) || "NA";
+
+  if (!parentId || !firstName || !lastName) {
+    authMessage.textContent = "Choose a parent and enter the student's first and last name.";
+    return;
+  }
+
+  if (getParentChildCount(parentId) >= 2) {
+    authMessage.textContent = "This parent already has 2 kids assigned.";
+    return;
+  }
+
+  if (findChildByFullName(firstName, lastName)) {
+    authMessage.textContent = "A student profile with that first and last name already exists.";
+    return;
+  }
+
+  try {
+    await createChildProfile({ parentId, firstName, lastName, age, state });
+    academyStudentForm.reset();
+    renderStateOptions(academyStudentState, "CA");
+    authMessage.textContent = "Student added.";
+    renderParentDashboard();
+  } catch (error) {
+    authMessage.textContent = getDatabaseErrorMessage(error);
+  }
+});
+
 parentQuestionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const parent = getCurrentParent();
@@ -3249,6 +4223,8 @@ parentQuestionForm.addEventListener("submit", async (event) => {
   const selectedLevel = String(formData.get("parentQuestionLevel") || "all");
   const path = String(formData.get("parentQuestionPath") || skills[subject][0].key);
   const count = Math.min(20, Math.max(1, Number(formData.get("parentQuestionCount") || 5)));
+  const testMode = String(formData.get("parentQuestionMode") || "auto");
+  const timedChallenge = formData.get("parentQuestionTimed") === "on" && testMode === "auto" && count > 1;
   const prompt = String(formData.get("parentQuestionPrompt") || "").trim() || "Answer this parent check.";
   const customQuestion = String(formData.get("parentQuestionText") || "").trim();
   const customAnswer = String(formData.get("parentQuestionAnswer") || "").trim();
@@ -3265,17 +4241,20 @@ parentQuestionForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (customQuestion && !customAnswer) {
+  if (testMode === "custom" && (!customQuestion || !customAnswer)) {
     authMessage.textContent = "Add the correct answer for the custom question.";
     return;
   }
 
   try {
     let sentCount = 0;
+    const sharedTestGroupId = testMode === "auto" && count > 1
+      ? `${timedChallenge ? "challenge" : "test"}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+      : "";
 
     for (const child of selectedChildren) {
       const ageGroup = selectedLevel === "all" ? getAgeGroup(child.age) : selectedLevel;
-      const questions = customQuestion
+      const questions = testMode === "custom"
         ? [{
           subject,
           prompt,
@@ -3290,10 +4269,12 @@ parentQuestionForm.addEventListener("submit", async (event) => {
           parentId: isAcademy ? child.parentId : parent.id,
           childId: child.id,
           subject: item.subject,
-          prompt: questions.length > 1 ? `${item.prompt} (${item.order || sentCount + 1}/${questions.length})` : item.prompt,
+          prompt: questions.length > 1 ? `${item.prompt} (${item.order || 1}/${questions.length})` : item.prompt,
           question: item.question,
           answer: item.answer,
-          explanation: item.explanation
+          explanation: item.explanation,
+          testGroupId: questions.length > 1 ? sharedTestGroupId : "",
+          timedChallenge
         });
         sentCount += 1;
       }
@@ -3301,6 +4282,7 @@ parentQuestionForm.addEventListener("submit", async (event) => {
 
     parentQuestionForm.reset();
     renderParentQuestionTopicOptions();
+    renderParentQuestionMode();
     authMessage.textContent = `${sentCount} question${sentCount === 1 ? "" : "s"} sent.`;
     renderParentDashboard();
   } catch (error) {
@@ -3310,11 +4292,25 @@ parentQuestionForm.addEventListener("submit", async (event) => {
 
 parentQuestionSubject.addEventListener("change", () => {
   renderParentQuestionTopicOptions();
+  preloadEditableParentQuestion();
+});
+
+parentQuestionMode.addEventListener("change", () => {
+  renderParentQuestionMode();
 });
 
 parentQuestionLevel.addEventListener("change", () => {
   const parent = getCurrentParent();
   renderParentQuestionManager(parent, session && session.role === "academy");
+  preloadEditableParentQuestion();
+});
+
+parentQuestionPath.addEventListener("change", () => {
+  preloadEditableParentQuestion();
+});
+
+parentQuestionChild.addEventListener("change", () => {
+  preloadEditableParentQuestion();
 });
 
 academyManagement.addEventListener("click", async (event) => {
@@ -3395,22 +4391,43 @@ parentDashboard.addEventListener("input", (event) => {
   }
 });
 
-topicSelect.addEventListener("change", () => {
+topicSelect.addEventListener("change", async () => {
   const selectedValue = topicSelect.value || "";
+  const selectedGroupId = selectedValue.startsWith("testgroup:")
+    ? selectedValue.slice(10)
+    : "";
   const selectedTestId = selectedValue.startsWith("test:")
     ? selectedValue.slice(5)
     : "";
+  const child = getCurrentChild();
+  const selectedGroupQuestion = selectedGroupId
+    ? getPendingParentQuestionInGroup(child, selectedGroupId)
+    : null;
   const selectedTest = selectedTestId ? getParentQuestionById(selectedTestId) : null;
 
-  if (selectedTest && selectedTest.status === "pending") {
+  if (selectedGroupQuestion) {
+    try {
+      await markParentQuestionGroupStarted(selectedGroupId, child);
+    } catch (error) {
+      feedback.className = "feedback needs-work";
+      feedback.textContent = `Timer started here, but the database did not save the start time yet: ${getDatabaseErrorMessage(error)}`;
+    }
+    appState.path = null;
+    appState.mode = "parent-check";
+    appState.parentQuestionId = selectedGroupQuestion.id;
+    appState.parentTestGroupId = selectedGroupId;
+    appState.subject = selectedGroupQuestion.subject;
+  } else if (selectedTest && selectedTest.status === "pending") {
     appState.path = null;
     appState.mode = "parent-check";
     appState.parentQuestionId = selectedTest.id;
+    appState.parentTestGroupId = null;
     appState.subject = selectedTest.subject;
   } else {
     appState.path = selectedValue || null;
     appState.mode = "practice";
     appState.parentQuestionId = null;
+    appState.parentTestGroupId = null;
   }
 
   appState.index = 0;
@@ -3433,6 +4450,8 @@ subjectButtons.forEach((button) => {
     appState.correct = 0;
     appState.answered = 0;
     appState.startedAt = Date.now();
+    appState.parentQuestionId = null;
+    appState.parentTestGroupId = null;
     appState.parentQuestionJustCompleted = false;
     render();
   });
@@ -3483,18 +4502,35 @@ answerForm.addEventListener("submit", async (event) => {
     demoData.attempts.push(attempt);
 
     if (question.parentQuestionId) {
+      const activeParentQuestion = getParentQuestionById(question.parentQuestionId);
+      const activeGroupId = appState.parentTestGroupId || (activeParentQuestion ? activeParentQuestion.testGroupId : "");
       try {
         await markParentQuestionAnswered(question.parentQuestionId, answerInput.value, isCorrect);
       } catch (error) {
         feedback.className = "feedback needs-work";
         feedback.textContent = `Answer checked, but the parent question status did not save yet: ${getDatabaseErrorMessage(error)}`;
       }
-      appState.mode = "practice";
-      appState.parentQuestionId = null;
-      appState.index = 0;
-      appState.correct = 0;
-      appState.answered = 0;
-      appState.startedAt = Date.now();
+      const nextGroupQuestion = activeGroupId
+        ? getPendingParentQuestionInGroup(child, activeGroupId)
+        : null;
+      if (nextGroupQuestion) {
+        appState.mode = "parent-check";
+        appState.parentQuestionId = nextGroupQuestion.id;
+        appState.parentTestGroupId = activeGroupId;
+        appState.subject = nextGroupQuestion.subject;
+      } else {
+        const completedSubject = appState.subject;
+        appState.mode = "practice";
+        appState.parentQuestionId = null;
+        appState.parentTestGroupId = null;
+        if (!content[completedSubject]) {
+          appState.subject = "math";
+        }
+        appState.index = 0;
+        appState.correct = 0;
+        appState.answered = 0;
+        appState.startedAt = Date.now();
+      }
       appState.parentQuestionJustCompleted = true;
     }
 
