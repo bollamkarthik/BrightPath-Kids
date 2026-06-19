@@ -15,7 +15,7 @@
   <body>
     <section class="auth-screen" id="authScreen">
       <div class="auth-hero">
-        <p class="eyebrow">Demo accounts</p>
+        <p class="eyebrow">BrightPath portal</p>
         <h1>BrightPath for kids and parents</h1>
         <p>Parents can add up to two child profiles and review progress. Kids sign in with their name and private child code.</p>
       </div>
@@ -25,26 +25,26 @@
           <span class="auth-badge">Parent</span>
           <h2>Parent login</h2>
           <label for="parentName">Name</label>
-          <input id="parentName" name="parentName" autocomplete="name" value="Karthik" />
+          <input id="parentName" name="parentName" autocomplete="name" placeholder="Parent name" />
           <label for="parentEmail">Email</label>
-          <input id="parentEmail" name="parentEmail" autocomplete="email" value="parent@example.com" />
+          <input id="parentEmail" name="parentEmail" autocomplete="email" placeholder="parent@example.com" />
           <label for="parentPassword">Password</label>
-          <input id="parentPassword" name="parentPassword" type="password" autocomplete="current-password" value="demo123" />
+          <input id="parentPassword" name="parentPassword" type="password" autocomplete="current-password" />
           <button type="submit">Enter parent dashboard</button>
-          <p class="helper-text">New parent email creates a parent profile. Demo only; this saves to this browser.</p>
+          <p class="helper-text">New parent accounts can create child profiles and review saved progress.</p>
         </form>
 
         <form class="auth-card" id="kidLoginForm">
           <span class="auth-badge kid">Kid</span>
           <h2>Kid login</h2>
           <label for="kidFirstName">First name</label>
-          <input id="kidFirstName" name="kidFirstName" autocomplete="given-name" value="Avery" />
+          <input id="kidFirstName" name="kidFirstName" autocomplete="given-name" placeholder="First name" />
           <label for="kidLastName">Last name</label>
-          <input id="kidLastName" name="kidLastName" autocomplete="family-name" value="Stone" />
+          <input id="kidLastName" name="kidLastName" autocomplete="family-name" placeholder="Last name" />
           <label for="kidCode">Child code</label>
-          <input id="kidCode" name="kidCode" autocomplete="off" value="AVERY123" />
+          <input id="kidCode" name="kidCode" autocomplete="off" placeholder="Child code" />
           <button type="submit">Start learning</button>
-          <p class="helper-text">Try <strong>Avery Stone</strong> with code <strong>AVERY123</strong>, or use the code shown in the parent dashboard.</p>
+          <p class="helper-text">Use the child code shown in the parent dashboard.</p>
         </form>
 
         <details class="auth-card organizer-card">
@@ -160,6 +160,45 @@
                 <select id="parentChildState" name="parentChildState"></select>
               </div>
               <button type="submit">Create child profile</button>
+            </form>
+          </section>
+
+          <section class="parent-question-manager hidden" id="parentQuestionManager" aria-label="Send a question">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Parent check</p>
+                <h2>Send a question</h2>
+              </div>
+            </div>
+            <form class="parent-question-form" id="parentQuestionForm">
+              <div>
+                <label for="parentQuestionChild">Child</label>
+                <select id="parentQuestionChild" name="parentQuestionChild"></select>
+              </div>
+              <div>
+                <label for="parentQuestionSubject">Subject</label>
+                <select id="parentQuestionSubject" name="parentQuestionSubject">
+                  <option value="math">Math</option>
+                  <option value="english">English</option>
+                </select>
+              </div>
+              <div>
+                <label for="parentQuestionPrompt">Prompt</label>
+                <input id="parentQuestionPrompt" name="parentQuestionPrompt" placeholder="Example: Solve this parent check" />
+              </div>
+              <div>
+                <label for="parentQuestionText">Question</label>
+                <input id="parentQuestionText" name="parentQuestionText" placeholder="Example: 12 x 7 = ?" />
+              </div>
+              <div>
+                <label for="parentQuestionAnswer">Correct answer</label>
+                <input id="parentQuestionAnswer" name="parentQuestionAnswer" placeholder="Example: 84" />
+              </div>
+              <div>
+                <label for="parentQuestionExplanation">Explanation</label>
+                <input id="parentQuestionExplanation" name="parentQuestionExplanation" placeholder="Example: 12 x 7 means seven groups of twelve." />
+              </div>
+              <button type="submit">Send question</button>
             </form>
           </section>
 

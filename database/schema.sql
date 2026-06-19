@@ -35,6 +35,22 @@ create table if not exists public.attempts (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.parent_questions (
+  id uuid primary key default gen_random_uuid(),
+  parent_id uuid not null references public.parents(id) on delete cascade,
+  child_id uuid not null references public.students(id) on delete cascade,
+  subject text not null check (subject in ('math', 'english')),
+  prompt text not null default 'Answer this parent check.',
+  question text not null,
+  correct_answer text not null,
+  explanation text,
+  status text not null default 'pending' check (status in ('pending', 'answered')),
+  child_answer text,
+  correct boolean,
+  created_at timestamptz not null default now(),
+  answered_at timestamptz
+);
+
 create table if not exists public.academy_admins (
   user_id uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()
@@ -43,6 +59,7 @@ create table if not exists public.academy_admins (
 alter table public.parents enable row level security;
 alter table public.students enable row level security;
 alter table public.attempts enable row level security;
+alter table public.parent_questions enable row level security;
 alter table public.academy_admins enable row level security;
 
 create or replace function public.is_academy_admin()
@@ -138,6 +155,41 @@ using (
   )
 );
 
+drop policy if exists "parents and admins can read parent questions" on public.parent_questions;
+create policy "parents and admins can read parent questions"
+on public.parent_questions for select
+using (
+  parent_id = auth.uid()
+  or public.is_academy_admin()
+);
+
+drop policy if exists "parents can send own child questions" on public.parent_questions;
+create policy "parents can send own child questions"
+on public.parent_questions for insert
+with check (
+  public.is_academy_admin()
+  or (
+    parent_id = auth.uid()
+    and exists (
+      select 1
+      from public.students
+      where students.id = parent_questions.child_id
+        and students.parent_id = auth.uid()
+    )
+  )
+);
+
+drop policy if exists "parents can update own child questions" on public.parent_questions;
+create policy "parents can update own child questions"
+on public.parent_questions for update
+using (parent_id = auth.uid() or public.is_academy_admin())
+with check (parent_id = auth.uid() or public.is_academy_admin());
+
+drop policy if exists "parents and admins can delete parent questions" on public.parent_questions;
+create policy "parents and admins can delete parent questions"
+on public.parent_questions for delete
+using (parent_id = auth.uid() or public.is_academy_admin());
+
 drop policy if exists "admins can read academy admin table" on public.academy_admins;
 create policy "admins can read academy admin table"
 on public.academy_admins for select
@@ -156,6 +208,7 @@ as $$
 declare
   selected_student public.students%rowtype;
   student_attempts jsonb;
+  student_parent_questions jsonb;
 begin
   select *
   into selected_student
@@ -174,9 +227,15 @@ begin
   from public.attempts
   where attempts.child_id = selected_student.id;
 
+  select coalesce(jsonb_agg(to_jsonb(parent_questions) order by parent_questions.created_at desc), '[]'::jsonb)
+  into student_parent_questions
+  from public.parent_questions
+  where parent_questions.child_id = selected_student.id;
+
   return jsonb_build_object(
     'student', to_jsonb(selected_student),
-    'attempts', student_attempts
+    'attempts', student_attempts,
+    'parent_questions', student_parent_questions
   );
 end;
 $$;
@@ -257,8 +316,49 @@ begin
 end;
 $$;
 
+create or replace function public.complete_parent_question(
+  question_id uuid,
+  student_code text,
+  child_answer text,
+  was_correct boolean,
+  answered_time timestamptz default now()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_question public.parent_questions%rowtype;
+begin
+  select parent_questions.*
+  into selected_question
+  from public.parent_questions
+  join public.students on students.id = parent_questions.child_id
+  where parent_questions.id = question_id
+    and upper(students.code) = upper(trim(student_code))
+  limit 1;
+
+  if not found then
+    raise exception 'The child code does not match this parent question.';
+  end if;
+
+  update public.parent_questions
+  set
+    status = 'answered',
+    child_answer = complete_parent_question.child_answer,
+    correct = was_correct,
+    answered_at = coalesce(answered_time, now())
+  where id = question_id
+  returning * into selected_question;
+
+  return to_jsonb(selected_question);
+end;
+$$;
+
 grant execute on function public.student_portal_by_code(text, text, text) to anon, authenticated;
 grant execute on function public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, jsonb) to anon, authenticated;
+grant execute on function public.complete_parent_question(uuid, text, text, boolean, timestamptz) to anon, authenticated;
 
 drop function if exists public.academy_roster(text);
 drop function if exists public.academy_roster();
@@ -275,6 +375,7 @@ declare
   parent_rows jsonb;
   student_rows jsonb;
   attempt_rows jsonb;
+  parent_question_rows jsonb;
 begin
   if request_token <> 'dashboard' then
     raise exception 'Invalid academy request.';
@@ -296,12 +397,26 @@ begin
   into attempt_rows
   from public.attempts;
 
+  select coalesce(jsonb_agg(to_jsonb(parent_questions) order by parent_questions.created_at desc), '[]'::jsonb)
+  into parent_question_rows
+  from public.parent_questions;
+
   return jsonb_build_object(
     'parents', parent_rows,
     'students', student_rows,
-    'attempts', attempt_rows
+    'attempts', attempt_rows,
+    'parent_questions', parent_question_rows
   );
 end;
+$$;
+
+create or replace function public.academy_roster()
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select public.academy_roster('dashboard');
 $$;
 
 create or replace function public.academy_delete_student(
@@ -340,9 +455,10 @@ begin
 end;
 $$;
 
-grant execute on function public.academy_roster(text) to authenticated;
-grant execute on function public.academy_delete_student(uuid) to authenticated;
-grant execute on function public.academy_delete_parent(uuid) to authenticated;
+grant execute on function public.academy_roster(text) to anon, authenticated;
+grant execute on function public.academy_roster() to anon, authenticated;
+grant execute on function public.academy_delete_student(uuid) to anon, authenticated;
+grant execute on function public.academy_delete_parent(uuid) to anon, authenticated;
 
 create or replace view public.student_work_summary as
 select

@@ -7,7 +7,9 @@ const appState = {
   index: 0,
   correct: 0,
   answered: 0,
-  startedAt: Date.now()
+  startedAt: Date.now(),
+  parentQuestionId: null,
+  parentQuestionJustCompleted: false
 };
 
 const dashboardState = {
@@ -723,7 +725,8 @@ function createDemoData() {
       { id: "child-avery", parentId: "parent-demo", firstName: "Avery", lastName: "Stone", name: "Avery Stone", age: 8, state: "CA", code: "AVERY123" },
       { id: "child-maya", parentId: "parent-demo", firstName: "Maya", lastName: "Patel", name: "Maya Patel", age: 12, state: "TX", code: "MAYA456" }
     ],
-    attempts: []
+    attempts: [],
+    parentQuestions: []
   };
 }
 
@@ -819,6 +822,24 @@ function mapAttemptFromRow(row) {
   };
 }
 
+function mapParentQuestionFromRow(row) {
+  return {
+    id: row.id,
+    parentId: row.parent_id,
+    childId: row.child_id,
+    subject: row.subject,
+    prompt: row.prompt,
+    question: row.question,
+    answer: row.correct_answer,
+    explanation: row.explanation || "",
+    status: row.status || "pending",
+    childAnswer: row.child_answer || "",
+    correct: row.correct,
+    createdAt: new Date(row.created_at).getTime(),
+    answeredAt: row.answered_at ? new Date(row.answered_at).getTime() : null
+  };
+}
+
 function getDatabaseErrorMessage(error) {
   return error && error.message ? error.message : "The database did not accept that change yet.";
 }
@@ -834,10 +855,16 @@ function isDatabaseUuid(value) {
 async function loadDatabaseData() {
   if (!hasDatabaseConnection()) return;
 
-  const [{ data: parents, error: parentError }, { data: children, error: childError }, { data: attempts, error: attemptError }] = await Promise.all([
+  const [
+    { data: parents, error: parentError },
+    { data: children, error: childError },
+    { data: attempts, error: attemptError },
+    { data: parentQuestions, error: parentQuestionError }
+  ] = await Promise.all([
     supabaseClient.from("parents").select("*").order("created_at", { ascending: true }),
     supabaseClient.from("students").select("*").order("created_at", { ascending: true }),
-    supabaseClient.from("attempts").select("*").order("created_at", { ascending: false })
+    supabaseClient.from("attempts").select("*").order("created_at", { ascending: false }),
+    supabaseClient.from("parent_questions").select("*").order("created_at", { ascending: false })
   ]);
 
   const error = parentError || childError || attemptError;
@@ -848,7 +875,8 @@ async function loadDatabaseData() {
   demoData = {
     parents: (parents || []).map(mapParentFromRow),
     children: (children || []).map(mapChildFromRow),
-    attempts: (attempts || []).map(mapAttemptFromRow)
+    attempts: (attempts || []).map(mapAttemptFromRow),
+    parentQuestions: parentQuestionError ? [] : (parentQuestions || []).map(mapParentQuestionFromRow)
   };
   ensureDemoAccounts();
   saveDemoData();
@@ -868,7 +896,8 @@ async function loadAcademyData() {
   demoData = {
     parents: (data.parents || []).map(mapParentFromRow),
     children: (data.students || []).map(mapChildFromRow),
-    attempts: (data.attempts || []).map(mapAttemptFromRow)
+    attempts: (data.attempts || []).map(mapAttemptFromRow),
+    parentQuestions: (data.parent_questions || []).map(mapParentQuestionFromRow)
   };
   ensureDemoAccounts();
   saveDemoData();
@@ -880,7 +909,7 @@ async function signInAcademyAdmin({ email, password }) {
       return { email };
     }
 
-    throw new Error("Admin login needs Supabase connected. Demo fallback: admin@brightpath.test / admin123.");
+    throw new Error("Admin login needs the database connection.");
   }
 
   const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -993,6 +1022,7 @@ async function signInChildWithCode({ firstName, lastName, code }) {
 
   const child = mapChildFromRow(data.student);
   const attempts = (data.attempts || []).map(mapAttemptFromRow);
+  const parentQuestions = (data.parent_questions || []).map(mapParentQuestionFromRow);
 
   demoData.children = [
     ...demoData.children.filter((item) => item.id !== child.id),
@@ -1001,6 +1031,10 @@ async function signInChildWithCode({ firstName, lastName, code }) {
   demoData.attempts = [
     ...demoData.attempts.filter((attempt) => attempt.childId !== child.id),
     ...attempts
+  ];
+  demoData.parentQuestions = [
+    ...(demoData.parentQuestions || []).filter((question) => question.childId !== child.id),
+    ...parentQuestions
   ];
 
   if (!demoData.parents.some((parent) => parent.id === child.parentId)) {
@@ -1057,6 +1091,107 @@ async function createChildProfile({ parentId, firstName, lastName, age, state })
   demoData.children.push(child);
   saveDemoData();
   return child;
+}
+
+function makeParentQuestionId() {
+  return `parent-question-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+}
+
+async function createParentQuestion({ parentId, childId, subject, prompt, question, answer, explanation }) {
+  const parentQuestion = {
+    id: makeParentQuestionId(),
+    parentId,
+    childId,
+    subject,
+    prompt,
+    question,
+    answer,
+    explanation,
+    status: "pending",
+    childAnswer: "",
+    correct: null,
+    createdAt: Date.now(),
+    answeredAt: null
+  };
+
+  if (hasDatabaseConnection() && isDatabaseUuid(parentId) && isDatabaseUuid(childId)) {
+    const { data, error } = await supabaseClient
+      .from("parent_questions")
+      .insert({
+        parent_id: parentId,
+        child_id: childId,
+        subject,
+        prompt,
+        question,
+        correct_answer: answer,
+        explanation
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    const savedQuestion = mapParentQuestionFromRow(data);
+    demoData.parentQuestions = [
+      savedQuestion,
+      ...(demoData.parentQuestions || [])
+    ];
+    saveDemoData();
+    return savedQuestion;
+  }
+
+  demoData.parentQuestions = [
+    parentQuestion,
+    ...(demoData.parentQuestions || [])
+  ];
+  saveDemoData();
+  return parentQuestion;
+}
+
+function getChildParentQuestions(childId) {
+  return (demoData.parentQuestions || [])
+    .filter((question) => question.childId === childId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function getPendingParentQuestion(child) {
+  if (!child) return null;
+
+  return getChildParentQuestions(child.id)
+    .filter((question) => question.status === "pending")
+    .sort((a, b) => a.createdAt - b.createdAt)[0] || null;
+}
+
+function getParentQuestionById(questionId) {
+  return (demoData.parentQuestions || []).find((question) => question.id === questionId) || null;
+}
+
+async function markParentQuestionAnswered(questionId, childAnswer, isCorrect) {
+  const parentQuestion = getParentQuestionById(questionId);
+  if (!parentQuestion) return;
+
+  parentQuestion.status = "answered";
+  parentQuestion.childAnswer = childAnswer;
+  parentQuestion.correct = isCorrect;
+  parentQuestion.answeredAt = Date.now();
+
+  if (hasDatabaseConnection() && isDatabaseUuid(questionId)) {
+    const { error } = await supabaseClient.rpc("complete_parent_question", {
+      question_id: questionId,
+      student_code: session && session.childCode ? session.childCode : "",
+      child_answer: childAnswer,
+      was_correct: isCorrect,
+      answered_time: new Date(parentQuestion.answeredAt).toISOString()
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  saveDemoData();
 }
 
 async function deleteChildProfile(childId) {
@@ -1169,6 +1304,7 @@ function removeSeedAttempts() {
 }
 
 function normalizeDemoData() {
+  demoData.parentQuestions = demoData.parentQuestions || [];
   demoData.children = demoData.children.map((child) => {
     const nameParts = String(child.name || "").trim().split(/\s+/).filter(Boolean);
     const firstName = child.firstName || nameParts[0] || "Student";
@@ -1313,6 +1449,7 @@ function getParentChildCount(parentId) {
 function deleteChild(childId) {
   demoData.children = demoData.children.filter((child) => child.id !== childId);
   demoData.attempts = demoData.attempts.filter((attempt) => attempt.childId !== childId);
+  demoData.parentQuestions = (demoData.parentQuestions || []).filter((question) => question.childId !== childId);
 }
 
 function deleteParent(parentId) {
@@ -1323,6 +1460,7 @@ function deleteParent(parentId) {
   demoData.parents = demoData.parents.filter((parent) => parent.id !== parentId);
   demoData.children = demoData.children.filter((child) => child.parentId !== parentId);
   demoData.attempts = demoData.attempts.filter((attempt) => !childIds.includes(attempt.childId));
+  demoData.parentQuestions = (demoData.parentQuestions || []).filter((question) => !childIds.includes(question.childId));
 }
 
 function getPlacementJudgment(accuracy) {
@@ -1496,6 +1634,45 @@ function renderParentChildManager(parent) {
   if (submitButton) {
     submitButton.disabled = isFull;
   }
+}
+
+function renderParentQuestionManager(parent, isAcademy = false) {
+  if ((!parent && !isAcademy) || !parentQuestionManager || !parentQuestionChild) return;
+
+  const children = isAcademy
+    ? demoData.children
+    : demoData.children.filter((child) => child.parentId === parent.id);
+
+  parentQuestionManager.classList.toggle("hidden", !children.length);
+  parentQuestionChild.innerHTML = children.map((child) => `
+    <option value="${escapeHtml(child.id)}">${escapeHtml(child.name)}${isAcademy ? ` - ${escapeHtml(getParentName(child.parentId))}` : ""}</option>
+  `).join("");
+}
+
+function renderParentQuestionStatus(child) {
+  const questions = getChildParentQuestions(child.id);
+  const pending = questions.filter((question) => question.status === "pending");
+  const latestAnswered = questions.find((question) => question.status === "answered");
+
+  if (pending.length) {
+    return `
+      <div class="parent-question-note">
+        <strong>${pending.length} parent question${pending.length === 1 ? "" : "s"} waiting</strong>
+        <span>${escapeHtml(getSubjectLabel(pending[0].subject))}: ${escapeHtml(pending[0].question)}</span>
+      </div>
+    `;
+  }
+
+  if (latestAnswered) {
+    return `
+      <div class="parent-question-note answered">
+        <strong>Latest parent question answered</strong>
+        <span>${latestAnswered.correct ? "Correct" : "Needs review"} - Kid answer: ${escapeHtml(latestAnswered.childAnswer || "blank")} - Right answer: ${escapeHtml(latestAnswered.answer)}</span>
+      </div>
+    `;
+  }
+
+  return "";
 }
 
 function getSubjectLabel(subject) {
@@ -1781,6 +1958,9 @@ const academyManagement = document.querySelector("#academyManagement");
 const workReview = document.querySelector("#workReview");
 const parentChildManager = document.querySelector("#parentChildManager");
 const parentChildForm = document.querySelector("#parentChildForm");
+const parentQuestionManager = document.querySelector("#parentQuestionManager");
+const parentQuestionForm = document.querySelector("#parentQuestionForm");
+const parentQuestionChild = document.querySelector("#parentQuestionChild");
 const parentChildState = document.querySelector("#parentChildState");
 const parentChildLimitNote = document.querySelector("#parentChildLimitNote");
 const parentRoster = document.querySelector("#parentRoster");
@@ -2458,6 +2638,43 @@ function getDifficultyLabel(difficulty) {
 function getCurrentTrack() {
   const size = appState.worksheetSize;
 
+  if (appState.mode === "parent-check") {
+    const child = getCurrentChild();
+    const parentQuestion = getParentQuestionById(appState.parentQuestionId) || getPendingParentQuestion(child);
+    const subjectLabel = parentQuestion && parentQuestion.subject === "english" ? "English" : "Math";
+    const question = parentQuestion
+      ? {
+        title: "Parent check",
+        prompt: parentQuestion.prompt || `${subjectLabel} question from your parent`,
+        text: parentQuestion.question,
+        answer: parentQuestion.answer,
+        hint: parentQuestion.explanation || "Think through the question carefully, then compare with the correct answer.",
+        explanation: parentQuestion.explanation || "",
+        skill: "Parent check",
+        difficulty: "medium",
+        parentQuestionId: parentQuestion.id
+      }
+      : {
+        title: "Parent check",
+        prompt: "Your parent question was completed.",
+        text: "Choose a topic to continue practice.",
+        answer: "",
+        hint: "",
+        explanation: "",
+        skill: "Parent check",
+        difficulty: "medium"
+      };
+
+    return {
+      focus: `${subjectLabel} parent check`,
+      description: "A short question sent from the parent dashboard.",
+      level: "Parent check",
+      mastery: "Parent assignment",
+      value: 50,
+      questions: [question]
+    };
+  }
+
   if (appState.mode === "placement") {
     const questions = getPlacementQuestionSet(appState.subject, appState.age);
     const seed = getDailyQuestionSeed([appState.subject, appState.age, "placement"]);
@@ -2551,6 +2768,20 @@ function renderTopicSelect() {
 
 function syncLearnerMode() {
   const child = getCurrentChild();
+  const parentQuestion = getPendingParentQuestion(child);
+
+  if (parentQuestion && appState.answered === 0) {
+    appState.mode = "parent-check";
+    appState.parentQuestionId = parentQuestion.id;
+    appState.subject = parentQuestion.subject;
+    return;
+  }
+
+  if (appState.mode === "parent-check" && !parentQuestion) {
+    appState.mode = "practice";
+    appState.parentQuestionId = null;
+  }
+
   const needsPlacement = child && !hasPlacementResult(child, appState.subject);
 
   if (needsPlacement && !appState.path && appState.answered === 0) {
@@ -2628,8 +2859,10 @@ function renderParentDashboard() {
   if (isAcademy) {
     renderAcademySummary(allChildren);
     renderAcademyManagement();
+    renderParentQuestionManager(null, true);
   } else {
     renderParentChildManager(parent);
+    renderParentQuestionManager(parent);
   }
 
   if (!allChildren.length) {
@@ -2727,6 +2960,7 @@ function renderParentDashboard() {
           </div>
           <span class="code-pill">${escapeHtml(child.code)}</span>
         </header>
+        ${renderParentQuestionStatus(child)}
         ${performanceHistory}
         <div class="subject-pies">
           ${renderSubjectPie(child, "Math", "math", mathStats, selectedDate)}
@@ -2782,6 +3016,9 @@ function render() {
   const roundSize = track.questions.length || 1;
 
   levelChip.textContent = track.level;
+  subjectButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.subject === appState.subject);
+  });
 
   questionTitle.textContent = question.title;
   questionPrompt.textContent = question.prompt;
@@ -2846,6 +3083,8 @@ kidLoginForm.addEventListener("submit", async (event) => {
     appState.correct = 0;
     appState.answered = 0;
     appState.startedAt = Date.now();
+    appState.parentQuestionId = null;
+    appState.parentQuestionJustCompleted = false;
     saveSession();
     authMessage.textContent = "";
     render();
@@ -2919,6 +3158,47 @@ parentChildForm.addEventListener("submit", async (event) => {
     parentChildForm.reset();
     renderStateOptions(parentChildState, "CA");
     authMessage.textContent = "";
+    renderParentDashboard();
+  } catch (error) {
+    authMessage.textContent = getDatabaseErrorMessage(error);
+  }
+});
+
+parentQuestionForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const parent = getCurrentParent();
+  const isAcademy = session && session.role === "academy";
+  const formData = new FormData(parentQuestionForm);
+  const childId = String(formData.get("parentQuestionChild") || "");
+  const selectedChild = demoData.children.find((child) => child.id === childId);
+  const subject = String(formData.get("parentQuestionSubject") || "math");
+  const prompt = String(formData.get("parentQuestionPrompt") || "").trim() || "Answer this parent check.";
+  const question = String(formData.get("parentQuestionText") || "").trim();
+  const answer = String(formData.get("parentQuestionAnswer") || "").trim();
+  const explanation = String(formData.get("parentQuestionExplanation") || "").trim();
+
+  if ((!parent && !isAcademy) || !childId || !question || !answer) {
+    authMessage.textContent = "Choose a child, enter a question, and add the correct answer.";
+    return;
+  }
+
+  if (!selectedChild || (!isAcademy && selectedChild.parentId !== parent.id)) {
+    authMessage.textContent = "Choose one of your child profiles.";
+    return;
+  }
+
+  try {
+    await createParentQuestion({
+      parentId: isAcademy ? selectedChild.parentId : parent.id,
+      childId,
+      subject,
+      prompt,
+      question,
+      answer,
+      explanation
+    });
+    parentQuestionForm.reset();
+    authMessage.textContent = "Question sent to the child.";
     renderParentDashboard();
   } catch (error) {
     authMessage.textContent = getDatabaseErrorMessage(error);
@@ -3010,6 +3290,7 @@ topicSelect.addEventListener("change", () => {
   appState.correct = 0;
   appState.answered = 0;
   appState.startedAt = Date.now();
+  appState.parentQuestionJustCompleted = false;
   render();
   document.querySelector("#practice").scrollIntoView({ behavior: "smooth", block: "start" });
   answerInput.focus();
@@ -3025,6 +3306,7 @@ subjectButtons.forEach((button) => {
     appState.correct = 0;
     appState.answered = 0;
     appState.startedAt = Date.now();
+    appState.parentQuestionJustCompleted = false;
     render();
   });
 });
@@ -3069,6 +3351,22 @@ answerForm.addEventListener("submit", async (event) => {
 
     demoData.attempts.push(attempt);
 
+    if (question.parentQuestionId) {
+      try {
+        await markParentQuestionAnswered(question.parentQuestionId, answerInput.value, isCorrect);
+      } catch (error) {
+        feedback.className = "feedback needs-work";
+        feedback.textContent = `Answer checked, but the parent question status did not save yet: ${getDatabaseErrorMessage(error)}`;
+      }
+      appState.mode = "practice";
+      appState.parentQuestionId = null;
+      appState.index = 0;
+      appState.correct = 0;
+      appState.answered = 0;
+      appState.startedAt = Date.now();
+      appState.parentQuestionJustCompleted = true;
+    }
+
     if (isPlacementComplete) {
       const accuracy = Math.round((appState.correct / appState.answered) * 100);
       child.placement = child.placement || {};
@@ -3103,6 +3401,13 @@ hintButton.addEventListener("click", () => {
 });
 
 nextButton.addEventListener("click", () => {
+  if (appState.parentQuestionJustCompleted) {
+    appState.parentQuestionJustCompleted = false;
+    render();
+    answerInput.focus();
+    return;
+  }
+
   const roundSize = getCurrentRoundSize();
 
   if (appState.answered >= roundSize) {

@@ -496,6 +496,58 @@ h2 {
   border-radius: 8px;
 }
 
+.parent-question-manager {
+  display: grid;
+  gap: 14px;
+}
+
+.parent-question-form {
+  display: grid;
+  grid-template-columns: minmax(150px, .8fr) 130px repeat(2, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+  background: rgba(255, 255, 255, .78);
+  border: 1px solid rgba(47, 50, 125, .08);
+  border-radius: 8px;
+}
+
+.parent-question-form div:nth-child(5),
+.parent-question-form div:nth-child(6) {
+  grid-column: span 2;
+}
+
+.parent-question-form button {
+  min-height: 44px;
+  color: #fff;
+  font-weight: 900;
+  background: var(--ink);
+  border: 0;
+  border-radius: 8px;
+}
+
+.parent-question-note {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  color: #2f327d;
+  background: #fff6d8;
+  border: 1px solid #ffe08c;
+  border-radius: 8px;
+}
+
+.parent-question-note.answered {
+  color: #245a43;
+  background: #e9fff4;
+  border-color: #a8e6c4;
+}
+
+.parent-question-note span {
+  color: var(--muted);
+  font-size: .92rem;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1200,6 +1252,12 @@ body {
   border-color: var(--line);
 }
 
+.parent-question-form {
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  background: #fff;
+  border-color: var(--line);
+}
+
 .report-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1279,6 +1337,12 @@ body {
 
 .parent-mode .add-child-form {
   grid-template-columns: repeat(2, minmax(150px, 1fr)) 132px 132px auto;
+  gap: 10px;
+  padding: 12px;
+}
+
+.parent-mode .parent-question-form {
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
   gap: 10px;
   padding: 12px;
 }
@@ -1393,6 +1457,7 @@ body {
 
   .auth-grid,
   .academy-summary,
+  .parent-question-form,
   .management-grid,
   .roster-grid,
   .ranking-grid,
@@ -1413,6 +1478,11 @@ body {
 
   .coach-card {
     display: none;
+  }
+
+  .parent-question-form div:nth-child(5),
+  .parent-question-form div:nth-child(6) {
+    grid-column: auto;
   }
 
   .practice-layout {

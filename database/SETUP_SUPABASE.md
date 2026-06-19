@@ -14,6 +14,7 @@ This creates:
 - parent profiles
 - student profiles
 - student attempts
+- parent/admin pushed questions
 - placement results
 - academy admin table
 - safety rules so parents only see their own students
