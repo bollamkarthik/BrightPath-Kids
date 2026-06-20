@@ -24,6 +24,9 @@ const parentQuestionDraft = {
   questions: []
 };
 
+const MAX_PARENT_TEST_QUESTIONS = 200;
+const UNLIMITED_CHILD_LIMIT = Number.MAX_SAFE_INTEGER;
+
 const content = {
   math: {
     early: {
@@ -940,6 +943,7 @@ function hasDatabaseConnection() {
 function mapParentFromRow(row) {
   return {
     id: row.id,
+    authUserId: row.auth_user_id || row.id,
     name: row.name,
     email: row.email,
     password: "",
@@ -958,7 +962,7 @@ function mapChildFromRow(row) {
     lastName,
     name: `${firstName} ${lastName}`.trim(),
     age: row.age,
-    state: (row.state || "NA").toUpperCase(),
+    state: "NA",
     code: row.code,
     placement: row.placement || {}
   };
@@ -1017,15 +1021,16 @@ function isDatabaseUuid(value) {
 }
 
 function normalizeChildLimit(value) {
-  return Math.min(20, Math.max(1, Number(value || 2)));
+  if (value === Infinity || value === "unlimited") return UNLIMITED_CHILD_LIMIT;
+  return Math.max(1, Number(value || UNLIMITED_CHILD_LIMIT));
 }
 
 function getParentChildLimit(parentOrId) {
-  const parent = typeof parentOrId === "object" && parentOrId
-    ? parentOrId
-    : demoData.parents.find((item) => item.id === parentOrId);
+  return UNLIMITED_CHILD_LIMIT;
+}
 
-  return normalizeChildLimit(parent && parent.childLimit);
+function formatChildLimit() {
+  return "Unlimited";
 }
 
 async function loadDatabaseData() {
@@ -1137,7 +1142,7 @@ async function signInOrCreateParent({ name, email, password }) {
       return localParent;
     }
 
-    localParent = { id: `parent-${Date.now()}`, name, email, password, childLimit: 2 };
+    localParent = { id: `parent-${Date.now()}`, name, email, password, childLimit: UNLIMITED_CHILD_LIMIT };
     demoData.parents.push(localParent);
     saveDemoData();
     return localParent;
@@ -1161,7 +1166,7 @@ async function signInOrCreateParent({ name, email, password }) {
   const activeSession = authResult.data.session;
 
   if (!user || !activeSession) {
-    localParent = { id: `parent-${Date.now()}`, name, email, password, needsEmailConfirmation: true };
+    localParent = { id: `parent-${Date.now()}`, name, email, password, needsEmailConfirmation: true, childLimit: UNLIMITED_CHILD_LIMIT };
     demoData.parents.push(localParent);
     saveDemoData();
     return localParent;
@@ -1230,7 +1235,7 @@ async function signInChildWithCode({ firstName, lastName, code }) {
       name: "Parent",
       email: "",
       password: "",
-      childLimit: 2
+      childLimit: UNLIMITED_CHILD_LIMIT
     });
   }
 
@@ -1263,7 +1268,23 @@ async function refreshCurrentKidPortal({ rerender = false } = {}) {
   }
 }
 
-async function createChildProfile({ parentId, firstName, lastName, age, state }) {
+async function refreshDashboardData({ silent = false } = {}) {
+  if (!hasDatabaseConnection() || !session) return;
+
+  try {
+    if (session.role === "academy") {
+      await loadAcademyData();
+    } else if (session.role === "parent") {
+      await loadDatabaseData();
+    }
+  } catch (error) {
+    if (!silent) {
+      authMessage.textContent = getDatabaseErrorMessage(error);
+    }
+  }
+}
+
+async function createChildProfile({ parentId, firstName, lastName, age, state = "NA" }) {
   const name = `${firstName} ${lastName}`.trim();
 
   if (!hasDatabaseConnection() || !isDatabaseUuid(parentId)) {
@@ -1274,7 +1295,7 @@ async function createChildProfile({ parentId, firstName, lastName, age, state })
       lastName,
       name,
       age: Math.min(18, Math.max(4, age || 8)),
-      state,
+      state: "NA",
       code: makeUniqueChildCode(name)
     };
     demoData.children.push(child);
@@ -1290,7 +1311,7 @@ async function createChildProfile({ parentId, firstName, lastName, age, state })
       student_first_name: firstName,
       student_last_name: lastName,
       student_age: Math.min(18, Math.max(4, age || 8)),
-      student_state: state,
+      student_state: "NA",
       requested_code: code
     })
     : await supabaseClient
@@ -1300,7 +1321,7 @@ async function createChildProfile({ parentId, firstName, lastName, age, state })
         first_name: firstName,
         last_name: lastName,
         age: Math.min(18, Math.max(4, age || 8)),
-        state,
+        state: "NA",
         code
       })
       .select()
@@ -1330,7 +1351,7 @@ async function createAcademyParentProfile({ name, email }) {
       name,
       email,
       password: "",
-      childLimit: 2
+      childLimit: UNLIMITED_CHILD_LIMIT
     };
     demoData.parents.push(parent);
     saveDemoData();
@@ -1754,7 +1775,7 @@ function normalizeDemoData() {
       firstName,
       lastName,
       name: `${firstName} ${lastName}`.trim(),
-      state: (child.state || "NA").toUpperCase()
+      state: "NA"
     };
   });
   saveDemoData();
@@ -2024,8 +2045,6 @@ function renderAcademySummary(children) {
 }
 
 function renderAcademyManagement() {
-  renderStateOptions(academyStudentState, "CA");
-
   if (academyStudentParent) {
     academyStudentParent.innerHTML = demoData.parents.map((parent) => `
       <option value="${escapeHtml(parent.id)}">${escapeHtml(parent.name)} - ${escapeHtml(parent.email)}</option>
@@ -2034,19 +2053,13 @@ function renderAcademyManagement() {
 
   parentRoster.innerHTML = demoData.parents.map((parent) => {
     const childCount = getParentChildCount(parent.id);
-    const childLimit = getParentChildLimit(parent);
 
     return `
       <article class="roster-row">
         <span>
           <strong>${escapeHtml(parent.name)}</strong>
-          <small>${escapeHtml(parent.email)} - ${childCount}/${childLimit} kids assigned</small>
+          <small>${escapeHtml(parent.email)} - ${childCount} kid${childCount === 1 ? "" : "s"} assigned</small>
         </span>
-        <label class="limit-control">
-          <small>Kid limit</small>
-          <input type="number" min="${childCount || 1}" max="20" value="${childLimit}" data-parent-limit="${escapeHtml(parent.id)}" />
-        </label>
-        <button type="button" data-update-parent-limit="${escapeHtml(parent.id)}">Save limit</button>
         <button type="button" data-delete-parent="${escapeHtml(parent.id)}">Delete</button>
       </article>
     `;
@@ -2056,7 +2069,7 @@ function renderAcademyManagement() {
     <article class="roster-row">
       <span>
         <strong>${escapeHtml(child.name)}</strong>
-        <small>${escapeHtml(getChildLevelLabel(child))} - ${escapeHtml(child.state || "NA")} - ${escapeHtml(child.code)} - ${escapeHtml(getParentName(child.parentId))}</small>
+        <small>${escapeHtml(getChildLevelLabel(child))} - ${escapeHtml(child.code)} - ${escapeHtml(getParentName(child.parentId))}</small>
       </span>
       <button type="button" data-delete-child="${escapeHtml(child.id)}">Delete</button>
     </article>
@@ -2074,19 +2087,13 @@ function renderStateOptions(selectElement, selectedState = "CA") {
 function renderParentChildManager(parent) {
   if (!parent || !parentChildManager) return;
 
-  renderStateOptions(parentChildState, "CA");
-
   const childCount = getParentChildCount(parent.id);
-  const childLimit = getParentChildLimit(parent);
-  const isFull = childCount >= childLimit;
   const submitButton = parentChildForm.querySelector("button[type='submit']");
-  parentChildLimitNote.textContent = isFull
-    ? `${childLimit} of ${childLimit} profiles used`
-    : `${childCount} of ${childLimit} profiles used`;
-  parentChildForm.classList.toggle("hidden", isFull);
+  parentChildLimitNote.textContent = `${childCount} child profile${childCount === 1 ? "" : "s"} added`;
+  parentChildForm.classList.remove("hidden");
 
   if (submitButton) {
-    submitButton.disabled = isFull;
+    submitButton.disabled = false;
   }
 }
 
@@ -2102,6 +2109,15 @@ function renderParentQuestionManager(parent, isAcademy = false) {
     : children.filter((child) => getAgeGroup(child.age) === selectedLevel);
 
   parentQuestionManager.classList.toggle("hidden", !children.length);
+  if (parentQuestionSendAllWrap) {
+    parentQuestionSendAllWrap.classList.toggle("hidden", !isAcademy);
+    if (!isAcademy && parentQuestionSendAll) {
+      parentQuestionSendAll.checked = false;
+    }
+  }
+  if (parentQuestionChild && parentQuestionSendAll) {
+    parentQuestionChild.disabled = Boolean(isAcademy && parentQuestionSendAll.checked);
+  }
   parentQuestionChild.innerHTML = filteredChildren.map((child) => `
     <option value="${escapeHtml(child.id)}">${escapeHtml(child.name)}${isAcademy ? ` - ${escapeHtml(getParentName(child.parentId))}` : ""}</option>
   `).join("") || "<option value=\"\" disabled>No students match this level</option>";
@@ -2151,33 +2167,53 @@ function renderTimedChallengeBoard(children) {
       const first = childQuestions[0];
       const total = childQuestions.length;
       const answered = childQuestions.filter((question) => question.status === "answered").length;
+      const correct = childQuestions.filter((question) => question.status === "answered" && question.correct).length;
       const startedAt = first.challengeStartedAt;
       const finishedAt = first.challengeFinishedAt;
       const duration = startedAt && finishedAt ? finishedAt - startedAt : null;
       return {
         childName: child ? child.name : "Student",
         answered,
+        correct,
         total,
         duration,
         finishedAt,
+        allCorrect: answered === total && correct === total,
         label: duration ? formatDuration(duration) : `${answered}/${total} done`
       };
     }).sort((a, b) => {
+      if (a.allCorrect !== b.allCorrect) return a.allCorrect ? -1 : 1;
       if (a.duration && b.duration) return a.duration - b.duration;
       if (a.duration) return -1;
       if (b.duration) return 1;
-      return b.answered - a.answered || a.childName.localeCompare(b.childName);
+      return b.correct - a.correct || b.answered - a.answered || a.childName.localeCompare(b.childName);
     });
     const firstQuestion = questions[0];
+    const medalForRank = (index) => ["Gold", "Silver", "Bronze"][index] || `${index + 1}`;
 
     return `
       <article class="challenge-card">
         <h3>${escapeHtml(getSubjectLabel(firstQuestion.subject))} timer challenge</h3>
-        <ol>
-          ${rows.map((row) => `
-            <li><b>${escapeHtml(row.childName)}</b> - ${escapeHtml(row.label)}</li>
-          `).join("")}
-        </ol>
+        <table class="challenge-table">
+          <thead>
+            <tr>
+              <th>Place</th>
+              <th>Student</th>
+              <th>Score</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row, index) => `
+              <tr>
+                <td><span class="medal medal-${index + 1}">${escapeHtml(medalForRank(index))}</span></td>
+                <td>${escapeHtml(row.childName)}</td>
+                <td>${row.correct}/${row.total}</td>
+                <td>${escapeHtml(row.label)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
       </article>
     `;
   }).join("");
@@ -2207,9 +2243,10 @@ function getParentQuestionFormConfig() {
   const selectedLevel = parentQuestionLevel ? parentQuestionLevel.value || "all" : "all";
   const path = parentQuestionPath ? parentQuestionPath.value || skills[subject][0].key : skills[subject][0].key;
   const count = parentQuestionCount
-    ? Math.min(20, Math.max(1, Number(parentQuestionCount.value || 5)))
+    ? Math.min(MAX_PARENT_TEST_QUESTIONS, Math.max(1, Number(parentQuestionCount.value || 5)))
     : 5;
   const testMode = parentQuestionMode ? parentQuestionMode.value || "auto" : "auto";
+  const sendAll = Boolean(parentQuestionSendAll && parentQuestionSendAll.checked && session && session.role === "academy");
   const childIds = parentQuestionChild
     ? Array.from(parentQuestionChild.selectedOptions || []).map((option) => option.value).filter(Boolean)
     : [];
@@ -2218,7 +2255,7 @@ function getParentQuestionFormConfig() {
     : `Complete this ${formatTopicName(path)} check.`;
   const timedChallenge = !!(parentQuestionTimed && parentQuestionTimed.checked && count > 1);
 
-  return { subject, selectedLevel, path, count, testMode, childIds, prompt, timedChallenge };
+  return { subject, selectedLevel, path, count, testMode, childIds, prompt, timedChallenge, sendAll };
 }
 
 function getParentQuestionDraftKey(config = getParentQuestionFormConfig()) {
@@ -2228,7 +2265,8 @@ function getParentQuestionDraftKey(config = getParentQuestionFormConfig()) {
     selectedLevel: config.selectedLevel,
     path: config.path,
     count: config.count,
-    timedChallenge: config.timedChallenge
+    timedChallenge: config.timedChallenge,
+    sendAll: config.sendAll
   });
 }
 
@@ -2486,19 +2524,6 @@ function summarizeAttemptTopics(attempts, isCorrect) {
     .map(([topic, count]) => `${topic} (${count})`);
 }
 
-function renderTopicNote(attempts) {
-  const rightTopics = summarizeAttemptTopics(attempts, true);
-  const wrongTopics = summarizeAttemptTopics(attempts, false);
-
-  return `
-    <div class="topic-note">
-      <strong>Topic note</strong>
-      <p><b>Got right:</b> ${rightTopics.length ? escapeHtml(rightTopics.join(", ")) : "No correct practice yet."}</p>
-      <p><b>Needs review:</b> ${wrongTopics.length ? escapeHtml(wrongTopics.join(", ")) : "No wrong answers yet."}</p>
-    </div>
-  `;
-}
-
 function getAttemptDateKey(timestamp) {
   const date = new Date(timestamp || Date.now());
   const year = date.getFullYear();
@@ -2668,6 +2693,8 @@ const parentQuestionPath = document.querySelector("#parentQuestionPath");
 const parentQuestionLevel = document.querySelector("#parentQuestionLevel");
 const parentQuestionCount = document.querySelector("#parentQuestionCount");
 const parentQuestionTimed = document.querySelector("#parentQuestionTimed");
+const parentQuestionSendAllWrap = document.querySelector("#parentQuestionSendAllWrap");
+const parentQuestionSendAll = document.querySelector("#parentQuestionSendAll");
 const parentQuestionMode = document.querySelector("#parentQuestionMode");
 const parentQuestionCustomFields = document.querySelectorAll(".custom-question-field");
 const parentQuestionText = document.querySelector("#parentQuestionText");
@@ -2700,6 +2727,7 @@ const feedback = document.querySelector("#feedback");
 const hintButton = document.querySelector("#hintButton");
 const nextButton = document.querySelector("#nextButton");
 const shareButtons = document.querySelectorAll("[data-share-app]");
+const celebrationLayer = document.querySelector("#celebrationLayer");
 
 async function shareAppLink() {
   const appUrl = `${window.location.origin}/`;
@@ -2724,6 +2752,22 @@ async function shareAppLink() {
 
 function normalize(value) {
   return value.trim().toLowerCase().replace(/\s+/g, "").replace(/,$/, "");
+}
+
+function triggerCelebration() {
+  if (!celebrationLayer) return;
+
+  celebrationLayer.innerHTML = Array.from({ length: 12 }, (_item, index) => (
+    `<span style="--x:${Math.random() * 90 + 5}%; --delay:${index * 22}ms; --hue:${Math.floor(Math.random() * 360)}"></span>`
+  )).join("");
+  celebrationLayer.classList.remove("pop");
+  void celebrationLayer.offsetWidth;
+  celebrationLayer.classList.add("pop");
+
+  window.setTimeout(() => {
+    celebrationLayer.classList.remove("pop");
+    celebrationLayer.innerHTML = "";
+  }, 900);
 }
 
 function getAdaptiveAgeGroup(ageGroup, difficulty) {
@@ -3726,11 +3770,30 @@ function getLevelPathQuestions(subject, path, ageGroup) {
   return mergeUniqueQuestions([...starterQuestions, ...extraQuestions, ...generatedQuestions]).slice(0, 20);
 }
 
+function buildSizedQuestionSet(questions, count, seedText) {
+  if (!questions.length) return [];
+
+  const shuffled = shuffleWithSeed(questions, seedText);
+  const result = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const base = shuffled[index % shuffled.length];
+    result.push({
+      ...base,
+      prompt: index >= shuffled.length ? `${base.prompt} Practice ${Math.floor(index / shuffled.length) + 1}.` : base.prompt
+    });
+  }
+
+  return result;
+}
+
 function buildParentTestQuestions({ subject, path, ageGroup, count, prompt }) {
-  const sourceQuestions = getLevelPathQuestions(subject, path, ageGroup);
+  const starterQuestions = getLevelPathQuestions(subject, path, ageGroup);
+  const generatedQuestions = getGeneratedQuestions(subject, ageGroup, path, Math.max(count * 2, 24));
+  const sourceQuestions = mergeUniqueQuestions([...starterQuestions, ...generatedQuestions]);
   const seed = [getTodayKey(), subject, path, ageGroup, "parent-test"].join("|");
 
-  return buildWorksheet(sourceQuestions, count, seed).map((question, index) => ({
+  return buildSizedQuestionSet(sourceQuestions, count, seed).map((question, index) => ({
     subject,
     prompt: prompt || `${getSubjectLabel(subject)} ${getAgeGroupLabel(ageGroup)} skill check`,
     question: question.text,
@@ -4068,7 +4131,6 @@ function renderParentDashboard() {
 
   if (!allChildren.length) {
     rankingGrid.innerHTML = "";
-    stateRankingGrid.innerHTML = "";
     parentReport.innerHTML = `
       <article class="report-card">
         <h3>No child profiles yet</h3>
@@ -4111,31 +4173,6 @@ function renderParentDashboard() {
     `;
   }).join("");
 
-  const states = [...new Set(childrenWithStats.map((item) => (item.child.state || "NA").toUpperCase()))].sort();
-  stateRankingGrid.innerHTML = states.map((state) => {
-    const rankedChildren = childrenWithStats
-      .filter((item) => (item.child.state || "NA").toUpperCase() === state)
-      .sort((a, b) => b.accuracy - a.accuracy || b.correct - a.correct || b.attempts.length - a.attempts.length || a.child.name.localeCompare(b.child.name));
-
-    const rows = rankedChildren.map((item, index) => `
-      <li>
-        <span class="rank-number">${index + 1}</span>
-        <span>
-          <strong>${escapeHtml(item.child.name)}</strong>
-          <small>${item.attempts.length} answers</small>
-        </span>
-        <b>${item.accuracy}%</b>
-      </li>
-    `).join("");
-
-    return `
-      <article class="ranking-card">
-        <h3>${escapeHtml(state)}</h3>
-        <ol class="ranking-list">${rows}</ol>
-      </article>
-    `;
-  }).join("");
-
   if (isAcademy) {
     parentReport.innerHTML = renderAcademyStudentSearch(childrenWithStats);
     return;
@@ -4149,7 +4186,6 @@ function renderParentDashboard() {
       : practiceAttempts;
     const mathStats = getAttemptStats(visiblePracticeAttempts.filter((attempt) => attempt.subject === "math"));
     const englishStats = getAttemptStats(visiblePracticeAttempts.filter((attempt) => attempt.subject === "english"));
-    const topicNote = renderTopicNote(visiblePracticeAttempts);
     const performanceHistory = renderPerformanceHistory(child, practiceAttempts);
 
     return `
@@ -4157,7 +4193,7 @@ function renderParentDashboard() {
         <header>
           <div>
             <h3>${escapeHtml(child.name)}</h3>
-            <p class="helper-text">${escapeHtml(getChildLevelLabel(child))} - ${escapeHtml(child.state || "NA")}</p>
+            <p class="helper-text">${escapeHtml(getChildLevelLabel(child))}</p>
           </div>
           <span class="code-pill">${escapeHtml(child.code)}</span>
         </header>
@@ -4167,7 +4203,6 @@ function renderParentDashboard() {
           ${renderSubjectPie(child, "Math", "math", mathStats, selectedDate)}
           ${renderSubjectPie(child, "English", "english", englishStats, selectedDate)}
         </div>
-        ${topicNote}
       </article>
     `;
   }).join("");
@@ -4335,9 +4370,7 @@ parentChildForm.addEventListener("submit", async (event) => {
   const formData = new FormData(parentChildForm);
   const firstName = String(formData.get("parentChildFirstName") || "").trim();
   const lastName = String(formData.get("parentChildLastName") || "").trim();
-  const name = `${firstName} ${lastName}`.trim();
   const age = Number(formData.get("parentChildAge") || 8);
-  const state = String(formData.get("parentChildState") || "NA").trim().toUpperCase().slice(0, 2) || "NA";
   const parentId = parent ? parent.id : "";
 
   if (!firstName || !lastName || !parentId) {
@@ -4345,21 +4378,17 @@ parentChildForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  const childLimit = getParentChildLimit(parentId);
-  if (getParentChildCount(parentId) >= childLimit) {
-    authMessage.textContent = `This parent profile can have up to ${childLimit} kid${childLimit === 1 ? "" : "s"}.`;
-    return;
-  }
-
   if (findChildByFullName(firstName, lastName, parentId)) {
-    authMessage.textContent = "A child profile with that first and last name already exists.";
+    authMessage.textContent = "That child profile already exists under this parent. Use the existing child code shown below.";
+    await refreshDashboardData({ silent: true });
+    renderParentDashboard();
     return;
   }
 
   try {
-    await createChildProfile({ parentId, firstName, lastName, age, state });
+    await createChildProfile({ parentId, firstName, lastName, age });
     parentChildForm.reset();
-    renderStateOptions(parentChildState, "CA");
+    await refreshDashboardData({ silent: true });
     authMessage.textContent = "";
     renderParentDashboard();
   } catch (error) {
@@ -4381,6 +4410,7 @@ academyParentForm.addEventListener("submit", async (event) => {
   try {
     await createAcademyParentProfile({ name, email });
     academyParentForm.reset();
+    await refreshDashboardData({ silent: true });
     authMessage.textContent = "Parent added. They can create their password from the parent login screen.";
     renderParentDashboard();
   } catch (error) {
@@ -4395,28 +4425,23 @@ academyStudentForm.addEventListener("submit", async (event) => {
   const firstName = String(formData.get("academyStudentFirstName") || "").trim();
   const lastName = String(formData.get("academyStudentLastName") || "").trim();
   const age = Number(formData.get("academyStudentAge") || 8);
-  const state = String(formData.get("academyStudentState") || "NA").trim().toUpperCase().slice(0, 2) || "NA";
 
   if (!parentId || !firstName || !lastName) {
     authMessage.textContent = "Choose a parent and enter the student's first and last name.";
     return;
   }
 
-  const childLimit = getParentChildLimit(parentId);
-  if (getParentChildCount(parentId) >= childLimit) {
-    authMessage.textContent = `This parent already has ${childLimit} kid${childLimit === 1 ? "" : "s"} assigned. Increase the kid limit first.`;
-    return;
-  }
-
   if (findChildByFullName(firstName, lastName, parentId)) {
     authMessage.textContent = "This parent already has a student profile with that first and last name.";
+    await refreshDashboardData({ silent: true });
+    renderParentDashboard();
     return;
   }
 
   try {
-    await createChildProfile({ parentId, firstName, lastName, age, state });
+    await createChildProfile({ parentId, firstName, lastName, age });
     academyStudentForm.reset();
-    renderStateOptions(academyStudentState, "CA");
+    await refreshDashboardData({ silent: true });
     authMessage.textContent = "Student added.";
     renderParentDashboard();
   } catch (error) {
@@ -4430,21 +4455,17 @@ parentQuestionForm.addEventListener("submit", async (event) => {
   const isAcademy = session && session.role === "academy";
   const formData = new FormData(parentQuestionForm);
   const config = getParentQuestionFormConfig();
-  const childIds = formData.getAll("parentQuestionChild").map(String).filter(Boolean);
-  const { subject, selectedLevel, path, count, testMode, prompt } = config;
+  const childIds = config.childIds.length
+    ? config.childIds
+    : formData.getAll("parentQuestionChild").map(String).filter(Boolean);
+  const { subject, selectedLevel, path, count, testMode, prompt, sendAll } = config;
   const timedChallenge = formData.get("parentQuestionTimed") === "on" && count > 1;
   const customQuestion = String(formData.get("parentQuestionText") || "").trim();
   const customAnswer = String(formData.get("parentQuestionAnswer") || "").trim();
   const customExplanation = String(formData.get("parentQuestionExplanation") || "").trim();
-  const selectedChildren = demoData.children.filter((child) => {
-    const canTarget = isAcademy || (parent && child.parentId === parent.id);
-    const matchesSelection = childIds.includes(child.id);
-    const matchesLevel = selectedLevel === "all" || getAgeGroup(child.age) === selectedLevel;
-    return canTarget && matchesSelection && matchesLevel;
-  });
 
-  if ((!parent && !isAcademy) || !selectedChildren.length) {
-    authMessage.textContent = "Choose at least one student.";
+  if (!parent && !isAcademy) {
+    authMessage.textContent = "Open a parent or master account before sending a test.";
     return;
   }
 
@@ -4487,6 +4508,20 @@ parentQuestionForm.addEventListener("submit", async (event) => {
       customQuestionSet = [...parentQuestionDraft.questions];
     }
 
+    const selectedChildren = demoData.children.filter((child) => {
+      const canTarget = isAcademy || (parent && child.parentId === parent.id);
+      const matchesLevel = selectedLevel === "all" || getAgeGroup(child.age) === selectedLevel;
+      const matchesSelection = sendAll || childIds.includes(child.id);
+      return canTarget && matchesSelection && matchesLevel;
+    });
+
+    if (!selectedChildren.length) {
+      authMessage.textContent = sendAll
+        ? "No students match this level yet."
+        : "Choose at least one student, or use Send to all students from the master account.";
+      return;
+    }
+
     let sentCount = 0;
     const sharedTestGroupId = count > 1
       ? `${timedChallenge ? "challenge" : "test"}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
@@ -4518,7 +4553,7 @@ parentQuestionForm.addEventListener("submit", async (event) => {
     resetParentQuestionDraft();
     renderParentQuestionTopicOptions();
     renderParentQuestionMode();
-    authMessage.textContent = `${sentCount} question${sentCount === 1 ? "" : "s"} sent.`;
+    authMessage.textContent = `${sentCount} question${sentCount === 1 ? "" : "s"} sent${sendAll ? " to all matching students" : ""}.`;
     renderParentDashboard();
   } catch (error) {
     authMessage.textContent = getDatabaseErrorMessage(error);
@@ -4563,6 +4598,16 @@ parentQuestionTimed.addEventListener("change", () => {
   renderParentQuestionMode();
 });
 
+if (parentQuestionSendAll) {
+  parentQuestionSendAll.addEventListener("change", () => {
+    resetParentQuestionDraft();
+    if (parentQuestionChild) {
+      parentQuestionChild.disabled = parentQuestionSendAll.checked;
+    }
+    renderParentQuestionMode();
+  });
+}
+
 parentQuestionDraftClear.addEventListener("click", () => {
   resetParentQuestionDraft();
   parentQuestionText.value = "";
@@ -4575,25 +4620,8 @@ parentQuestionDraftClear.addEventListener("click", () => {
 });
 
 academyManagement.addEventListener("click", async (event) => {
-  const limitButton = event.target.closest("[data-update-parent-limit]");
   const parentButton = event.target.closest("[data-delete-parent]");
   const childButton = event.target.closest("[data-delete-child]");
-
-  if (limitButton) {
-    const parentId = limitButton.dataset.updateParentLimit;
-    const limitInput = Array.from(academyManagement.querySelectorAll("[data-parent-limit]"))
-      .find((input) => input.dataset.parentLimit === parentId);
-    const nextLimit = normalizeChildLimit(limitInput ? limitInput.value : 2);
-
-    try {
-      await updateParentChildLimit(parentId, nextLimit);
-      authMessage.textContent = `Kid limit updated to ${nextLimit}.`;
-      renderParentDashboard();
-    } catch (error) {
-      authMessage.textContent = getDatabaseErrorMessage(error);
-    }
-    return;
-  }
 
   if (parentButton) {
     const parentId = parentButton.dataset.deleteParent;
@@ -4755,6 +4783,7 @@ answerForm.addEventListener("submit", async (event) => {
 
   if (isCorrect) {
     appState.correct += 1;
+    triggerCelebration();
   }
 
   appState.answered += 1;
@@ -4896,7 +4925,9 @@ async function startApp() {
 
         if (databaseSession && databaseSession.user) {
         await loadDatabaseData();
-        const parent = demoData.parents.find((item) => item.id === databaseSession.user.id);
+        const parent = demoData.parents.find((item) => {
+          return item.id === databaseSession.user.id || item.authUserId === databaseSession.user.id;
+        });
 
           if (parent && (!session || session.role === "parent")) {
             session = { role: "parent", parentId: parent.id };

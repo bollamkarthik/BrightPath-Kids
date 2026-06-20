@@ -504,7 +504,7 @@ h2 {
 
 .add-child-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr)) 150px 150px auto;
+  grid-template-columns: repeat(2, minmax(150px, 1fr)) 150px auto;
   gap: 12px;
   align-items: end;
   padding: 16px;
@@ -688,6 +688,89 @@ h2 {
 .challenge-card h3 {
   margin: 0;
   font-size: .95rem;
+}
+
+.challenge-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.challenge-table th,
+.challenge-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.challenge-table th {
+  color: var(--muted);
+  font-size: .78rem;
+  text-transform: uppercase;
+}
+
+.medal {
+  display: inline-flex;
+  min-width: 66px;
+  justify-content: center;
+  padding: 5px 8px;
+  color: var(--ink);
+  background: #eef2ff;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 950;
+}
+
+.medal-1 {
+  background: #ffe08a;
+}
+
+.medal-2 {
+  background: #e5e7eb;
+}
+
+.medal-3 {
+  background: #f7c49a;
+}
+
+.celebration-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.celebration-layer span {
+  position: absolute;
+  top: 18%;
+  left: var(--x);
+  width: 9px;
+  height: 18px;
+  opacity: 0;
+  background: hsl(var(--hue), 85%, 58%);
+  border-radius: 3px;
+  transform: translateY(0) rotate(0deg);
+}
+
+.celebration-layer.pop span {
+  animation: confetti-pop .82s ease-out var(--delay) forwards;
+}
+
+@keyframes confetti-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg) scale(.7);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(44vh) rotate(250deg) scale(1);
+  }
 }
 
 .challenge-card ol {
@@ -1078,25 +1161,6 @@ h2 {
   background: var(--coral);
 }
 
-.topic-note {
-  display: grid;
-  gap: 6px;
-  padding: 10px;
-  background: #fffaf0;
-  border: 1px solid #f2dfad;
-  border-radius: 8px;
-}
-
-.topic-note p {
-  margin: 0;
-  color: var(--muted);
-  font-size: .9rem;
-}
-
-.topic-note b {
-  color: var(--ink);
-}
-
 .performance-history {
   display: grid;
   gap: 6px;
@@ -1409,7 +1473,7 @@ body {
 }
 
 .add-child-form {
-  grid-template-columns: repeat(2, minmax(180px, 1fr)) 150px 150px auto;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) 150px auto;
   padding: 16px;
   background: #fff;
   border-color: var(--line);
@@ -1499,7 +1563,7 @@ body {
 }
 
 .parent-mode .add-child-form {
-  grid-template-columns: repeat(2, minmax(150px, 1fr)) 132px 132px auto;
+  grid-template-columns: repeat(2, minmax(150px, 1fr)) 132px auto;
   gap: 10px;
   padding: 12px;
 }
@@ -1584,7 +1648,6 @@ body {
   font-size: 1.05rem;
 }
 
-.parent-mode .topic-note p,
 .parent-mode .history-summary small,
 .parent-mode .helper-text,
 .parent-mode .ranking-list small {

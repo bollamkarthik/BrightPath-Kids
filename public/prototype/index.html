@@ -17,7 +17,7 @@
       <div class="auth-hero">
         <p class="eyebrow">BrightPath portal</p>
         <h1>BrightPath for kids and parents</h1>
-        <p>Parents can add child profiles up to the academy limit and review progress. Kids sign in with their name and private child code.</p>
+        <p>Parents can add child profiles and review progress. Kids sign in with their name and private child code.</p>
         <button class="share-button" type="button" data-share-app>Share app</button>
       </div>
 
@@ -138,7 +138,7 @@
                 <p class="eyebrow">Child profiles</p>
                 <h2>Add a child</h2>
               </div>
-              <span class="helper-text" id="parentChildLimitNote">0 profiles used</span>
+              <span class="helper-text" id="parentChildLimitNote">Unlimited child profiles</span>
             </div>
             <form class="add-child-form" id="parentChildForm">
               <div>
@@ -158,10 +158,6 @@
                   <option value="15">Level 4 (ages 14+)</option>
                 </select>
               </div>
-              <div>
-                <label class="required-label" for="parentChildState">State</label>
-                <select id="parentChildState" name="parentChildState" required></select>
-              </div>
               <button type="submit">Create child profile</button>
             </form>
           </section>
@@ -177,6 +173,13 @@
               <div>
                 <label for="parentQuestionChild">Students</label>
                 <select id="parentQuestionChild" name="parentQuestionChild" multiple></select>
+              </div>
+              <div class="checkbox-field master-send-all hidden" id="parentQuestionSendAllWrap">
+                <label for="parentQuestionSendAll">
+                  <input id="parentQuestionSendAll" name="parentQuestionSendAll" type="checkbox" />
+                  Send to all students
+                </label>
+                <span>Best for academy-wide competition tests.</span>
               </div>
               <div>
                 <label for="parentQuestionSubject">Subject</label>
@@ -207,6 +210,9 @@
                   <option value="5" selected>5 questions</option>
                   <option value="10">10 questions</option>
                   <option value="20">20 questions</option>
+                  <option value="50">50 questions</option>
+                  <option value="100">100 questions</option>
+                  <option value="200">200 questions</option>
                 </select>
               </div>
               <div class="checkbox-field">
@@ -230,6 +236,7 @@
               <div class="custom-question-field hidden">
                 <label for="parentQuestionText">Custom question</label>
                 <input id="parentQuestionText" name="parentQuestionText" placeholder="Example: 12 x 7 = ?" />
+                <small class="helper-text">Suggested from the selected level and topic. Edit before adding.</small>
               </div>
               <div class="custom-question-field hidden">
                 <label for="parentQuestionAnswer">Custom answer</label>
@@ -283,8 +290,6 @@
                   <option value="12">Level 3 (ages 11-13)</option>
                   <option value="15">Level 4 (ages 14+)</option>
                 </select>
-                <label class="required-label" for="academyStudentState">State</label>
-                <select id="academyStudentState" name="academyStudentState" required></select>
                 <button type="submit">Add student</button>
               </form>
             </div>
@@ -318,13 +323,6 @@
               </div>
             </div>
             <div class="ranking-grid" id="rankingGrid"></div>
-            <div class="section-heading compact-heading">
-              <div>
-                <p class="eyebrow">State</p>
-                <h2>State leaderboard</h2>
-              </div>
-            </div>
-            <div class="ranking-grid" id="stateRankingGrid"></div>
           </section>
 
           <div class="report-grid" id="parentReport"></div>
@@ -364,6 +362,7 @@
 
       </main>
     </div>
+    <div class="celebration-layer" id="celebrationLayer" aria-hidden="true"></div>
 
     <script src="./script.js"></script>
   </body>
