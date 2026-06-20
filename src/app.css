@@ -20,69 +20,43 @@ body {
   background: #f7f8fc;
 }
 
-.webapp-shell {
+.redirect-shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
+  place-items: center;
   min-height: 100vh;
-  padding: 10px;
+  padding: 24px;
 }
 
-.webapp-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
+.redirect-shell section {
+  width: min(420px, 100%);
+  padding: 24px;
+  text-align: center;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
 }
 
-.webapp-header p {
-  margin: 0 0 4px;
+.redirect-shell p {
+  margin: 0 0 8px;
   color: var(--violet);
   font-size: .78rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.webapp-header h1 {
-  margin: 0;
+.redirect-shell h1 {
+  margin: 0 0 18px;
   font-size: clamp(1.35rem, 2vw, 2rem);
 }
 
-.webapp-header a {
+.redirect-shell a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 12px;
   color: #fff;
   font-weight: 900;
   text-decoration: none;
   background: var(--ink);
   border-radius: 8px;
-}
-
-.prototype-frame {
-  overflow: hidden;
-  min-height: 0;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-.prototype-frame iframe {
-  display: block;
-  width: 100%;
-  height: calc(100vh - 98px);
-  border: 0;
-}
-
-@media (max-width: 760px) {
-  .webapp-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .prototype-frame iframe {
-    height: calc(100vh - 145px);
-  }
 }
