@@ -537,6 +537,31 @@ h2 {
   grid-column: span 2;
 }
 
+.question-draft-panel {
+  display: grid;
+  grid-column: span 2;
+  gap: 6px;
+  padding: 12px;
+  color: var(--ink);
+  background: #f6f8ff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.question-draft-panel span {
+  color: var(--muted);
+  font-size: .88rem;
+}
+
+.parent-question-form .question-draft-panel button {
+  justify-self: start;
+  min-height: 34px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
 .parent-question-form button {
   min-height: 44px;
   color: #fff;
@@ -1594,7 +1619,8 @@ body {
   }
 
   .parent-question-form div:nth-child(1),
-  .parent-question-form .custom-question-field {
+  .parent-question-form .custom-question-field,
+  .question-draft-panel {
     grid-column: auto;
     grid-row: auto;
   }

@@ -219,7 +219,7 @@
                 <label for="parentQuestionMode">Test type</label>
                 <select id="parentQuestionMode" name="parentQuestionMode">
                   <option value="auto" selected>Auto-generate selected count</option>
-                  <option value="custom">One editable topic question</option>
+                  <option value="custom">Build editable question set</option>
                 </select>
               </div>
               <div>
@@ -238,7 +238,12 @@
                 <label for="parentQuestionExplanation">Explanation</label>
                 <input id="parentQuestionExplanation" name="parentQuestionExplanation" placeholder="Optional custom explanation" />
               </div>
-              <button type="submit">Send selected test</button>
+              <div class="question-draft-panel hidden" id="parentQuestionDraftPanel">
+                <strong id="parentQuestionDraftTitle">No questions added yet</strong>
+                <span id="parentQuestionDraftStatus">Build the set one question at a time. The test sends only after the selected number is ready.</span>
+                <button type="button" id="parentQuestionDraftClear">Clear draft</button>
+              </div>
+              <button type="submit" id="parentQuestionSubmit">Send selected test</button>
             </form>
             <div class="timed-challenge-board" id="timedChallengeBoard"></div>
           </section>

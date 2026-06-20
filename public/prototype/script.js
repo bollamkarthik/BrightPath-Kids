@@ -18,6 +18,11 @@ const dashboardState = {
   academyStudentSearch: ""
 };
 
+const parentQuestionDraft = {
+  key: "",
+  questions: []
+};
+
 const content = {
   math: {
     early: {
@@ -2093,31 +2098,106 @@ function getParentQuestionPreviewLevel() {
   return child ? getAgeGroup(child.age) : "elementary";
 }
 
-function preloadEditableParentQuestion() {
-  if (!parentQuestionMode || parentQuestionMode.value !== "custom") return;
-  if (!parentQuestionSubject || !parentQuestionPath || !parentQuestionText || !parentQuestionAnswer) return;
-
-  const subject = parentQuestionSubject.value || "math";
-  const path = parentQuestionPath.value || skills[subject][0].key;
-  const ageGroup = getParentQuestionPreviewLevel();
+function getParentQuestionFormConfig() {
+  const subject = parentQuestionSubject ? parentQuestionSubject.value || "math" : "math";
+  const selectedLevel = parentQuestionLevel ? parentQuestionLevel.value || "all" : "all";
+  const path = parentQuestionPath ? parentQuestionPath.value || skills[subject][0].key : skills[subject][0].key;
+  const count = parentQuestionCount
+    ? Math.min(20, Math.max(1, Number(parentQuestionCount.value || 5)))
+    : 5;
+  const testMode = parentQuestionMode ? parentQuestionMode.value || "auto" : "auto";
+  const childIds = parentQuestionChild
+    ? Array.from(parentQuestionChild.selectedOptions || []).map((option) => option.value).filter(Boolean)
+    : [];
   const prompt = parentQuestionPrompt && parentQuestionPrompt.value.trim()
     ? parentQuestionPrompt.value.trim()
     : `Complete this ${formatTopicName(path)} check.`;
-  const [question] = buildParentTestQuestions({
-    subject,
-    path,
-    ageGroup,
-    count: 1,
-    prompt
+  const timedChallenge = !!(parentQuestionTimed && parentQuestionTimed.checked && count > 1);
+
+  return { subject, selectedLevel, path, count, testMode, childIds, prompt, timedChallenge };
+}
+
+function getParentQuestionDraftKey(config = getParentQuestionFormConfig()) {
+  return JSON.stringify({
+    childIds: [...config.childIds].sort(),
+    subject: config.subject,
+    selectedLevel: config.selectedLevel,
+    path: config.path,
+    count: config.count,
+    timedChallenge: config.timedChallenge
   });
+}
+
+function resetParentQuestionDraft() {
+  parentQuestionDraft.key = "";
+  parentQuestionDraft.questions = [];
+  renderParentQuestionDraft();
+}
+
+function syncParentQuestionDraft(config = getParentQuestionFormConfig()) {
+  const nextKey = getParentQuestionDraftKey(config);
+
+  if (parentQuestionDraft.key && parentQuestionDraft.key !== nextKey) {
+    parentQuestionDraft.questions = [];
+  }
+
+  parentQuestionDraft.key = nextKey;
+}
+
+function renderParentQuestionDraft(config = getParentQuestionFormConfig()) {
+  if (!parentQuestionDraftPanel || !parentQuestionSubmit) return;
+
+  const isCustom = config.testMode === "custom";
+  parentQuestionDraftPanel.classList.toggle("hidden", !isCustom);
+  parentQuestionSubmit.textContent = isCustom
+    ? `${parentQuestionDraft.questions.length + 1 >= config.count ? "Add final question and send" : `Add question ${parentQuestionDraft.questions.length + 1} of ${config.count}`}`
+    : "Send selected test";
+
+  if (!isCustom) return;
+
+  const ready = parentQuestionDraft.questions.length;
+  const remaining = Math.max(0, config.count - ready);
+
+  if (parentQuestionDraftTitle) {
+    parentQuestionDraftTitle.textContent = ready
+      ? `${ready} of ${config.count} questions ready`
+      : "No questions added yet";
+  }
+
+  if (parentQuestionDraftStatus) {
+    parentQuestionDraftStatus.textContent = remaining
+      ? `Add ${remaining} more question${remaining === 1 ? "" : "s"}. Nothing is sent to the student until the full set is ready.`
+      : "The full set is ready. The next click sends it to the selected student(s).";
+  }
+}
+
+function preloadEditableParentQuestion(force = false) {
+  if (!parentQuestionMode || parentQuestionMode.value !== "custom") return;
+  if (!parentQuestionSubject || !parentQuestionPath || !parentQuestionText || !parentQuestionAnswer) return;
+
+  const config = getParentQuestionFormConfig();
+  syncParentQuestionDraft(config);
+  renderParentQuestionDraft(config);
+
+  if (!force && (parentQuestionText.value.trim() || parentQuestionAnswer.value.trim())) return;
+
+  const ageGroup = getParentQuestionPreviewLevel();
+  const previewQuestions = buildParentTestQuestions({
+    subject: config.subject,
+    path: config.path,
+    ageGroup,
+    count: Math.max(config.count, parentQuestionDraft.questions.length + 1),
+    prompt: config.prompt
+  });
+  const question = previewQuestions[parentQuestionDraft.questions.length] || previewQuestions[0];
 
   if (!question) return;
 
   if (parentQuestionPrompt && !parentQuestionPrompt.value.trim()) {
     parentQuestionPrompt.value = question.prompt;
   }
-  parentQuestionText.value = question.question;
-  parentQuestionAnswer.value = question.answer;
+  parentQuestionText.value = question.question || "";
+  parentQuestionAnswer.value = question.answer || "";
   if (parentQuestionExplanation) {
     parentQuestionExplanation.value = question.explanation || "";
   }
@@ -2127,18 +2207,21 @@ function renderParentQuestionMode() {
   if (!parentQuestionMode) return;
 
   const isCustom = parentQuestionMode.value === "custom";
+  const config = getParentQuestionFormConfig();
   parentQuestionCustomFields.forEach((field) => field.classList.toggle("hidden", !isCustom));
 
   if (parentQuestionCount) {
-    parentQuestionCount.disabled = isCustom;
+    parentQuestionCount.disabled = false;
   }
 
   if (parentQuestionTimed) {
-    parentQuestionTimed.disabled = isCustom;
-    if (isCustom) {
+    parentQuestionTimed.disabled = config.count <= 1;
+    if (config.count <= 1) {
       parentQuestionTimed.checked = false;
     }
   }
+
+  renderParentQuestionDraft(config);
 
   if (isCustom) {
     preloadEditableParentQuestion();
@@ -2487,6 +2570,11 @@ const parentQuestionText = document.querySelector("#parentQuestionText");
 const parentQuestionAnswer = document.querySelector("#parentQuestionAnswer");
 const parentQuestionExplanation = document.querySelector("#parentQuestionExplanation");
 const parentQuestionPrompt = document.querySelector("#parentQuestionPrompt");
+const parentQuestionDraftPanel = document.querySelector("#parentQuestionDraftPanel");
+const parentQuestionDraftTitle = document.querySelector("#parentQuestionDraftTitle");
+const parentQuestionDraftStatus = document.querySelector("#parentQuestionDraftStatus");
+const parentQuestionDraftClear = document.querySelector("#parentQuestionDraftClear");
+const parentQuestionSubmit = document.querySelector("#parentQuestionSubmit");
 const timedChallengeBoard = document.querySelector("#timedChallengeBoard");
 const parentChildState = document.querySelector("#parentChildState");
 const parentChildLimitNote = document.querySelector("#parentChildLimitNote");
@@ -4218,14 +4306,10 @@ parentQuestionForm.addEventListener("submit", async (event) => {
   const parent = getCurrentParent();
   const isAcademy = session && session.role === "academy";
   const formData = new FormData(parentQuestionForm);
+  const config = getParentQuestionFormConfig();
   const childIds = formData.getAll("parentQuestionChild").map(String).filter(Boolean);
-  const subject = String(formData.get("parentQuestionSubject") || "math");
-  const selectedLevel = String(formData.get("parentQuestionLevel") || "all");
-  const path = String(formData.get("parentQuestionPath") || skills[subject][0].key);
-  const count = Math.min(20, Math.max(1, Number(formData.get("parentQuestionCount") || 5)));
-  const testMode = String(formData.get("parentQuestionMode") || "auto");
-  const timedChallenge = formData.get("parentQuestionTimed") === "on" && testMode === "auto" && count > 1;
-  const prompt = String(formData.get("parentQuestionPrompt") || "").trim() || "Answer this parent check.";
+  const { subject, selectedLevel, path, count, testMode, prompt } = config;
+  const timedChallenge = formData.get("parentQuestionTimed") === "on" && count > 1;
   const customQuestion = String(formData.get("parentQuestionText") || "").trim();
   const customAnswer = String(formData.get("parentQuestionAnswer") || "").trim();
   const customExplanation = String(formData.get("parentQuestionExplanation") || "").trim();
@@ -4241,27 +4325,54 @@ parentQuestionForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (testMode === "custom" && (!customQuestion || !customAnswer)) {
-    authMessage.textContent = "Add the correct answer for the custom question.";
-    return;
-  }
+  let customQuestionSet = [];
 
   try {
+    if (testMode === "custom") {
+      syncParentQuestionDraft(config);
+
+      if (!customQuestion || !customAnswer) {
+        authMessage.textContent = "Add the question and correct answer before moving to the next one.";
+        return;
+      }
+
+      parentQuestionDraft.questions = [
+        ...parentQuestionDraft.questions,
+        {
+          subject,
+          prompt,
+          question: customQuestion,
+          answer: customAnswer,
+          explanation: customExplanation,
+          order: parentQuestionDraft.questions.length + 1
+        }
+      ].slice(0, count);
+
+      if (parentQuestionDraft.questions.length < count) {
+        const nextNumber = parentQuestionDraft.questions.length + 1;
+        parentQuestionText.value = "";
+        parentQuestionAnswer.value = "";
+        if (parentQuestionExplanation) {
+          parentQuestionExplanation.value = "";
+        }
+        renderParentQuestionDraft(config);
+        preloadEditableParentQuestion(true);
+        authMessage.textContent = `Question ${nextNumber - 1} saved. Add question ${nextNumber} of ${count}. Nothing has been sent yet.`;
+        return;
+      }
+
+      customQuestionSet = [...parentQuestionDraft.questions];
+    }
+
     let sentCount = 0;
-    const sharedTestGroupId = testMode === "auto" && count > 1
+    const sharedTestGroupId = count > 1
       ? `${timedChallenge ? "challenge" : "test"}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
       : "";
 
     for (const child of selectedChildren) {
       const ageGroup = selectedLevel === "all" ? getAgeGroup(child.age) : selectedLevel;
       const questions = testMode === "custom"
-        ? [{
-          subject,
-          prompt,
-          question: customQuestion,
-          answer: customAnswer,
-          explanation: customExplanation
-        }]
+        ? customQuestionSet
         : buildParentTestQuestions({ subject, path, ageGroup, count, prompt });
 
       for (const item of questions) {
@@ -4281,6 +4392,7 @@ parentQuestionForm.addEventListener("submit", async (event) => {
     }
 
     parentQuestionForm.reset();
+    resetParentQuestionDraft();
     renderParentQuestionTopicOptions();
     renderParentQuestionMode();
     authMessage.textContent = `${sentCount} question${sentCount === 1 ? "" : "s"} sent.`;
@@ -4291,26 +4403,52 @@ parentQuestionForm.addEventListener("submit", async (event) => {
 });
 
 parentQuestionSubject.addEventListener("change", () => {
+  resetParentQuestionDraft();
   renderParentQuestionTopicOptions();
   preloadEditableParentQuestion();
 });
 
 parentQuestionMode.addEventListener("change", () => {
+  resetParentQuestionDraft();
   renderParentQuestionMode();
 });
 
 parentQuestionLevel.addEventListener("change", () => {
+  resetParentQuestionDraft();
   const parent = getCurrentParent();
   renderParentQuestionManager(parent, session && session.role === "academy");
   preloadEditableParentQuestion();
 });
 
 parentQuestionPath.addEventListener("change", () => {
+  resetParentQuestionDraft();
   preloadEditableParentQuestion();
 });
 
 parentQuestionChild.addEventListener("change", () => {
+  resetParentQuestionDraft();
   preloadEditableParentQuestion();
+});
+
+parentQuestionCount.addEventListener("change", () => {
+  resetParentQuestionDraft();
+  renderParentQuestionMode();
+});
+
+parentQuestionTimed.addEventListener("change", () => {
+  resetParentQuestionDraft();
+  renderParentQuestionMode();
+});
+
+parentQuestionDraftClear.addEventListener("click", () => {
+  resetParentQuestionDraft();
+  parentQuestionText.value = "";
+  parentQuestionAnswer.value = "";
+  if (parentQuestionExplanation) {
+    parentQuestionExplanation.value = "";
+  }
+  preloadEditableParentQuestion(true);
+  authMessage.textContent = "Question draft cleared.";
 });
 
 academyManagement.addEventListener("click", async (event) => {
