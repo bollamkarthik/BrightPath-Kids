@@ -7,6 +7,7 @@ const appState = {
   index: 0,
   correct: 0,
   answered: 0,
+  practiceRound: 0,
   startedAt: Date.now(),
   parentQuestionId: null,
   parentTestGroupId: null,
@@ -840,7 +841,7 @@ function buildWorksheet(questions, size, seedText = "daily") {
 function getDailyQuestionSeed(parts) {
   const child = getCurrentChild();
   const childKey = child ? child.id : "guest";
-  return [childKey, getTodayKey(), ...parts].join("|");
+  return [childKey, getTodayKey(), `round:${appState.practiceRound}`, ...parts].join("|");
 }
 
 const DATA_KEY = "brightpath-demo-data";
@@ -921,6 +922,7 @@ function readJson(key, fallback) {
 
 let demoData = readJson(DATA_KEY, createDemoData());
 let session = readJson(SESSION_KEY, null);
+let kidRefreshInFlight = false;
 
 const SUPABASE_PLACEHOLDER_KEY = "PASTE_SUPABASE_ANON_PUBLIC_KEY_HERE";
 const supabaseSettings = window.BRIGHTPATH_SUPABASE || {};
@@ -940,7 +942,8 @@ function mapParentFromRow(row) {
     id: row.id,
     name: row.name,
     email: row.email,
-    password: ""
+    password: "",
+    childLimit: normalizeChildLimit(row.child_limit)
   };
 }
 
@@ -1011,6 +1014,18 @@ function normalizeChildCode(value) {
 
 function isDatabaseUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+function normalizeChildLimit(value) {
+  return Math.min(20, Math.max(1, Number(value || 2)));
+}
+
+function getParentChildLimit(parentOrId) {
+  const parent = typeof parentOrId === "object" && parentOrId
+    ? parentOrId
+    : demoData.parents.find((item) => item.id === parentOrId);
+
+  return normalizeChildLimit(parent && parent.childLimit);
 }
 
 async function loadDatabaseData() {
@@ -1122,7 +1137,7 @@ async function signInOrCreateParent({ name, email, password }) {
       return localParent;
     }
 
-    localParent = { id: `parent-${Date.now()}`, name, email, password };
+    localParent = { id: `parent-${Date.now()}`, name, email, password, childLimit: 2 };
     demoData.parents.push(localParent);
     saveDemoData();
     return localParent;
@@ -1170,11 +1185,11 @@ async function signInChildWithCode({ firstName, lastName, code }) {
   const childCode = normalizeChildCode(code);
   const localChild = findChildByLogin(firstName, lastName, childCode);
 
-  if (localChild) {
-    return { child: localChild, code: childCode };
-  }
-
   if (!hasDatabaseConnection()) {
+    if (localChild) {
+      return { child: localChild, code: childCode };
+    }
+
     throw new Error("No child profile matches that name and code yet.");
   }
 
@@ -1185,6 +1200,10 @@ async function signInChildWithCode({ firstName, lastName, code }) {
   });
 
   if (error) {
+    if (localChild) {
+      return { child: localChild, code: childCode };
+    }
+
     throw error;
   }
 
@@ -1210,12 +1229,38 @@ async function signInChildWithCode({ firstName, lastName, code }) {
       id: child.parentId,
       name: "Parent",
       email: "",
-      password: ""
+      password: "",
+      childLimit: 2
     });
   }
 
   saveDemoData();
   return { child, code: childCode };
+}
+
+async function refreshCurrentKidPortal({ rerender = false } = {}) {
+  if (!hasDatabaseConnection() || !session || session.role !== "kid" || !session.childCode || kidRefreshInFlight) return;
+
+  const child = getCurrentChild();
+  if (!child) return;
+
+  kidRefreshInFlight = true;
+  try {
+    await signInChildWithCode({
+      firstName: child.firstName,
+      lastName: child.lastName,
+      code: session.childCode
+    });
+
+    if (rerender && appState.answered === 0) {
+      syncLearnerMode();
+      render();
+    }
+  } catch (error) {
+    authMessage.textContent = getDatabaseErrorMessage(error);
+  } finally {
+    kidRefreshInFlight = false;
+  }
 }
 
 async function createChildProfile({ parentId, firstName, lastName, age, state }) {
@@ -1284,7 +1329,8 @@ async function createAcademyParentProfile({ name, email }) {
       id: `parent-${Date.now()}`,
       name,
       email,
-      password: ""
+      password: "",
+      childLimit: 2
     };
     demoData.parents.push(parent);
     saveDemoData();
@@ -1307,6 +1353,41 @@ async function createAcademyParentProfile({ name, email }) {
   ];
   saveDemoData();
   return parent;
+}
+
+async function updateParentChildLimit(parentId, childLimit) {
+  const normalizedLimit = normalizeChildLimit(childLimit);
+  const localParent = demoData.parents.find((parent) => parent.id === parentId);
+
+  if (!localParent) {
+    throw new Error("Choose an existing parent.");
+  }
+
+  if (getParentChildCount(parentId) > normalizedLimit) {
+    throw new Error("The limit cannot be lower than the number of kids already assigned.");
+  }
+
+  if (hasDatabaseConnection() && isDatabaseUuid(parentId)) {
+    const { data, error } = await supabaseClient.rpc("academy_update_parent_child_limit", {
+      target_parent_id: parentId,
+      new_child_limit: normalizedLimit
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const updatedParent = mapParentFromRow(data);
+    demoData.parents = demoData.parents.map((parent) => (
+      parent.id === updatedParent.id ? { ...parent, ...updatedParent } : parent
+    ));
+    saveDemoData();
+    return updatedParent;
+  }
+
+  localParent.childLimit = normalizedLimit;
+  saveDemoData();
+  return localParent;
 }
 
 function makeParentQuestionId() {
@@ -1431,6 +1512,17 @@ function getPendingParentQuestion(child) {
   return getChildParentQuestions(child.id)
     .filter((question) => question.status === "pending" && !question.testGroupId)
     .sort((a, b) => a.createdAt - b.createdAt)[0] || null;
+}
+
+function getNextPendingParentAssignment(child) {
+  if (!child) return null;
+
+  const group = getPendingParentQuestionGroups(child)[0];
+  if (group && group.pending.length) {
+    return group.pending[0];
+  }
+
+  return getPendingParentQuestion(child);
 }
 
 function getParentQuestionById(questionId) {
@@ -1648,6 +1740,10 @@ function removeDefaultProfiles() {
 
 function normalizeDemoData() {
   demoData.parentQuestions = demoData.parentQuestions || [];
+  demoData.parents = (demoData.parents || []).map((parent) => ({
+    ...parent,
+    childLimit: normalizeChildLimit(parent.childLimit)
+  }));
   demoData.children = demoData.children.map((child) => {
     const nameParts = String(child.name || "").trim().split(/\s+/).filter(Boolean);
     const firstName = child.firstName || nameParts[0] || "Student";
@@ -1716,13 +1812,14 @@ function normalizeNamePart(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function findChildByFullName(firstName, lastName) {
+function findChildByFullName(firstName, lastName, parentId = "") {
   const targetFirst = normalizeNamePart(firstName);
   const targetLast = normalizeNamePart(lastName);
 
   return demoData.children.find((child) => {
     return normalizeNamePart(child.firstName) === targetFirst
-      && normalizeNamePart(child.lastName) === targetLast;
+      && normalizeNamePart(child.lastName) === targetLast
+      && (!parentId || child.parentId === parentId);
   });
 }
 
@@ -1937,13 +2034,19 @@ function renderAcademyManagement() {
 
   parentRoster.innerHTML = demoData.parents.map((parent) => {
     const childCount = getParentChildCount(parent.id);
+    const childLimit = getParentChildLimit(parent);
 
     return `
       <article class="roster-row">
         <span>
           <strong>${escapeHtml(parent.name)}</strong>
-          <small>${escapeHtml(parent.email)} - ${childCount}/2 kids assigned</small>
+          <small>${escapeHtml(parent.email)} - ${childCount}/${childLimit} kids assigned</small>
         </span>
+        <label class="limit-control">
+          <small>Kid limit</small>
+          <input type="number" min="${childCount || 1}" max="20" value="${childLimit}" data-parent-limit="${escapeHtml(parent.id)}" />
+        </label>
+        <button type="button" data-update-parent-limit="${escapeHtml(parent.id)}">Save limit</button>
         <button type="button" data-delete-parent="${escapeHtml(parent.id)}">Delete</button>
       </article>
     `;
@@ -1974,11 +2077,12 @@ function renderParentChildManager(parent) {
   renderStateOptions(parentChildState, "CA");
 
   const childCount = getParentChildCount(parent.id);
-  const isFull = childCount >= 2;
+  const childLimit = getParentChildLimit(parent);
+  const isFull = childCount >= childLimit;
   const submitButton = parentChildForm.querySelector("button[type='submit']");
   parentChildLimitNote.textContent = isFull
-    ? "2 of 2 profiles used"
-    : `${childCount} of 2 profiles used`;
+    ? `${childLimit} of ${childLimit} profiles used`
+    : `${childCount} of ${childLimit} profiles used`;
   parentChildForm.classList.toggle("hidden", isFull);
 
   if (submitButton) {
@@ -3677,8 +3781,11 @@ function getCurrentTrack() {
 
   if (appState.mode === "parent-check") {
     const child = getCurrentChild();
-    const parentQuestion = getParentQuestionById(appState.parentQuestionId) || getPendingParentQuestion(child);
-    const subjectLabel = parentQuestion && parentQuestion.subject === "english" ? "English" : "Math";
+    const selectedParentQuestion = getParentQuestionById(appState.parentQuestionId);
+    const parentQuestion = selectedParentQuestion && selectedParentQuestion.status === "pending"
+      ? selectedParentQuestion
+      : getNextPendingParentAssignment(child);
+    const subjectLabel = getSubjectLabel(parentQuestion ? parentQuestion.subject : appState.subject);
     const activeGroup = parentQuestion && parentQuestion.testGroupId
       ? getChildParentQuestionGroups(parentQuestion.childId).find((group) => group.groupId === parentQuestion.testGroupId)
       : null;
@@ -3738,10 +3845,12 @@ function getCurrentTrack() {
   if (appState.mode === "timed") {
     const questions = appState.subject === "math"
       ? pathQuestionBank.math.facts
-      : pathQuestionBank.english.grammar;
+      : appState.subject === "english"
+        ? pathQuestionBank.english.grammar
+        : getLevelPathQuestions("fun", appState.path || "logicPuzzles", appState.age);
     const seed = getDailyQuestionSeed([appState.subject, "timed"]);
     return {
-      focus: `${appState.subject === "math" ? "Math" : "English"} timed fluency`,
+      focus: `${getSubjectLabel(appState.subject)} timed fluency`,
       description: "A short fluency round builds accuracy and speed without changing the level.",
       level: "Timed",
       mastery: "Fluency",
@@ -3751,7 +3860,14 @@ function getCurrentTrack() {
   }
 
   if (appState.path) {
-    const track = pathContent[appState.subject][appState.path];
+    const skill = (skills[appState.subject] || []).find((item) => item.key === appState.path);
+    const track = pathContent[appState.subject]?.[appState.path] || {
+      focus: skill ? skill.title : getSubjectLabel(appState.subject),
+      description: skill ? skill.text : "Practice questions for this topic.",
+      level: skill ? skill.title : "Practice",
+      mastery: "Skill Practice",
+      value: 60
+    };
     const child = getCurrentChild();
     const adaptive = getAdaptiveProfile(child, appState.subject, appState.path);
     const questions = getAdaptiveQuestions(appState.subject, appState.path, appState.age, adaptive.difficulty, size);
@@ -3766,7 +3882,7 @@ function getCurrentTrack() {
     };
   }
 
-  const track = content[appState.subject][appState.age];
+  const track = (content[appState.subject] && content[appState.subject][appState.age]) || content.math[appState.age];
   const child = getCurrentChild();
   const adaptive = getAdaptiveProfile(child, appState.subject, appState.path);
   const questions = getAdaptiveQuestions(appState.subject, null, appState.age, adaptive.difficulty, size);
@@ -3845,9 +3961,12 @@ function syncLearnerMode() {
   const parentGroupQuestion = appState.parentTestGroupId
     ? getPendingParentQuestionInGroup(child, appState.parentTestGroupId)
     : null;
-  const parentQuestion = appState.parentQuestionId
+  const selectedParentQuestion = appState.parentQuestionId
     ? getParentQuestionById(appState.parentQuestionId)
-    : parentGroupQuestion || getPendingParentQuestion(child);
+    : null;
+  const parentQuestion = selectedParentQuestion && selectedParentQuestion.status === "pending"
+    ? selectedParentQuestion
+    : parentGroupQuestion || getNextPendingParentAssignment(child);
 
   if (parentQuestion && parentQuestion.status === "pending" && appState.answered === 0) {
     appState.mode = "parent-check";
@@ -3863,7 +3982,8 @@ function syncLearnerMode() {
     appState.parentTestGroupId = null;
   }
 
-  const needsPlacement = child && !hasPlacementResult(child, appState.subject);
+  const subjectUsesPlacement = appState.subject === "math" || appState.subject === "english";
+  const needsPlacement = subjectUsesPlacement && child && !hasPlacementResult(child, appState.subject);
 
   if (needsPlacement && !appState.path && appState.answered === 0) {
     appState.mode = "placement";
@@ -4163,6 +4283,7 @@ kidLoginForm.addEventListener("submit", async (event) => {
     appState.index = 0;
     appState.correct = 0;
     appState.answered = 0;
+    appState.practiceRound = 0;
     appState.startedAt = Date.now();
     appState.parentQuestionId = null;
     appState.parentQuestionJustCompleted = false;
@@ -4224,12 +4345,13 @@ parentChildForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (getParentChildCount(parentId) >= 2) {
-    authMessage.textContent = "Each parent profile can have up to 2 kids.";
+  const childLimit = getParentChildLimit(parentId);
+  if (getParentChildCount(parentId) >= childLimit) {
+    authMessage.textContent = `This parent profile can have up to ${childLimit} kid${childLimit === 1 ? "" : "s"}.`;
     return;
   }
 
-  if (findChildByFullName(firstName, lastName)) {
+  if (findChildByFullName(firstName, lastName, parentId)) {
     authMessage.textContent = "A child profile with that first and last name already exists.";
     return;
   }
@@ -4280,13 +4402,14 @@ academyStudentForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (getParentChildCount(parentId) >= 2) {
-    authMessage.textContent = "This parent already has 2 kids assigned.";
+  const childLimit = getParentChildLimit(parentId);
+  if (getParentChildCount(parentId) >= childLimit) {
+    authMessage.textContent = `This parent already has ${childLimit} kid${childLimit === 1 ? "" : "s"} assigned. Increase the kid limit first.`;
     return;
   }
 
-  if (findChildByFullName(firstName, lastName)) {
-    authMessage.textContent = "A student profile with that first and last name already exists.";
+  if (findChildByFullName(firstName, lastName, parentId)) {
+    authMessage.textContent = "This parent already has a student profile with that first and last name.";
     return;
   }
 
@@ -4452,8 +4575,25 @@ parentQuestionDraftClear.addEventListener("click", () => {
 });
 
 academyManagement.addEventListener("click", async (event) => {
+  const limitButton = event.target.closest("[data-update-parent-limit]");
   const parentButton = event.target.closest("[data-delete-parent]");
   const childButton = event.target.closest("[data-delete-child]");
+
+  if (limitButton) {
+    const parentId = limitButton.dataset.updateParentLimit;
+    const limitInput = Array.from(academyManagement.querySelectorAll("[data-parent-limit]"))
+      .find((input) => input.dataset.parentLimit === parentId);
+    const nextLimit = normalizeChildLimit(limitInput ? limitInput.value : 2);
+
+    try {
+      await updateParentChildLimit(parentId, nextLimit);
+      authMessage.textContent = `Kid limit updated to ${nextLimit}.`;
+      renderParentDashboard();
+    } catch (error) {
+      authMessage.textContent = getDatabaseErrorMessage(error);
+    }
+    return;
+  }
 
   if (parentButton) {
     const parentId = parentButton.dataset.deleteParent;
@@ -4571,6 +4711,7 @@ topicSelect.addEventListener("change", async () => {
   appState.index = 0;
   appState.correct = 0;
   appState.answered = 0;
+  appState.practiceRound = 0;
   appState.startedAt = Date.now();
   appState.parentQuestionJustCompleted = false;
   render();
@@ -4583,10 +4724,11 @@ subjectButtons.forEach((button) => {
     subjectButtons.forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     appState.subject = button.dataset.subject;
-    appState.path = null;
+    appState.path = appState.subject === "fun" ? skills.fun[0].key : null;
     appState.index = 0;
     appState.correct = 0;
     appState.answered = 0;
+    appState.practiceRound = 0;
     appState.startedAt = Date.now();
     appState.parentQuestionId = null;
     appState.parentTestGroupId = null;
@@ -4661,12 +4803,17 @@ answerForm.addEventListener("submit", async (event) => {
         appState.mode = "practice";
         appState.parentQuestionId = null;
         appState.parentTestGroupId = null;
-        if (!content[completedSubject]) {
+        if (completedSubject === "fun") {
+          appState.subject = "fun";
+          appState.path = skills.fun[0].key;
+        } else if (!content[completedSubject]) {
           appState.subject = "math";
+          appState.path = null;
         }
         appState.index = 0;
         appState.correct = 0;
         appState.answered = 0;
+        appState.practiceRound = 0;
         appState.startedAt = Date.now();
       }
       appState.parentQuestionJustCompleted = true;
@@ -4718,11 +4865,16 @@ nextButton.addEventListener("click", () => {
   if (appState.answered >= roundSize) {
     const accuracy = appState.answered ? Math.round((appState.correct / appState.answered) * 100) : 0;
     feedback.className = accuracy >= 80 ? "feedback correct" : "feedback needs-work";
-    feedback.textContent = `Worksheet complete: ${accuracy}% correct. ${accuracy >= 80 ? "Ready for the next step." : "Repeat this set before moving on."}`;
+    feedback.textContent = `Round complete: ${accuracy}% correct. Loading the next skill-level set.`;
     appState.index = 0;
     appState.correct = 0;
     appState.answered = 0;
+    appState.practiceRound += 1;
     appState.startedAt = Date.now();
+    render();
+    feedback.className = accuracy >= 80 ? "feedback correct" : "feedback needs-work";
+    feedback.textContent = `New round ready. This set adjusts from the latest work.`;
+    answerInput.focus();
     return;
   }
 
@@ -4736,6 +4888,8 @@ async function startApp() {
     try {
       if (session && session.role === "academy") {
         await loadAcademyData();
+      } else if (session && session.role === "kid") {
+        await refreshCurrentKidPortal();
       } else {
         const { data } = await supabaseClient.auth.getSession();
         const databaseSession = data && data.session;
@@ -4759,3 +4913,7 @@ async function startApp() {
 }
 
 startApp();
+
+setInterval(() => {
+  refreshCurrentKidPortal({ rerender: true });
+}, 15000);

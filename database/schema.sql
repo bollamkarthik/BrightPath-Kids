@@ -4,11 +4,15 @@ create table if not exists public.parents (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   email text not null unique,
+  child_limit integer not null default 2,
   created_at timestamptz not null default now()
 );
 
 alter table public.parents drop constraint if exists parents_id_fkey;
 alter table public.parents add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
+alter table public.parents add column if not exists child_limit integer not null default 2;
+alter table public.parents drop constraint if exists parents_child_limit_check;
+alter table public.parents add constraint parents_child_limit_check check (child_limit between 1 and 20);
 create unique index if not exists parents_auth_user_id_key on public.parents(auth_user_id) where auth_user_id is not null;
 update public.parents
 set auth_user_id = id
@@ -545,6 +549,7 @@ drop function if exists public.academy_roster(text);
 drop function if exists public.academy_roster();
 drop function if exists public.academy_create_parent(text, text);
 drop function if exists public.academy_create_student(uuid, text, text, integer, text, text);
+drop function if exists public.academy_update_parent_child_limit(uuid, integer);
 drop function if exists public.academy_delete_student(text, uuid);
 drop function if exists public.academy_delete_parent(text, uuid);
 
@@ -647,6 +652,8 @@ set search_path = public
 as $$
 declare
   saved_student public.students%rowtype;
+  existing_count integer;
+  allowed_count integer;
   base_code text;
   final_code text;
 begin
@@ -656,6 +663,20 @@ begin
 
   if not exists (select 1 from public.parents where id = target_parent_id) then
     raise exception 'Choose an existing parent before adding a student.';
+  end if;
+
+  select count(*)
+  into existing_count
+  from public.students
+  where parent_id = target_parent_id;
+
+  select child_limit
+  into allowed_count
+  from public.parents
+  where id = target_parent_id;
+
+  if existing_count >= allowed_count then
+    raise exception 'This parent has reached their child profile limit.';
   end if;
 
   if nullif(trim(student_first_name), '') is null or nullif(trim(student_last_name), '') is null then
@@ -689,6 +710,48 @@ begin
   returning * into saved_student;
 
   return saved_student;
+end;
+$$;
+
+create or replace function public.academy_update_parent_child_limit(
+  target_parent_id uuid,
+  new_child_limit integer
+)
+returns public.parents
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  existing_count integer;
+  normalized_limit integer;
+  saved_parent public.parents%rowtype;
+begin
+  if not public.is_academy_admin() then
+    raise exception 'This account is not an academy admin.';
+  end if;
+
+  normalized_limit := least(20, greatest(1, coalesce(new_child_limit, 2)));
+
+  select count(*)
+  into existing_count
+  from public.students
+  where parent_id = target_parent_id;
+
+  if existing_count > normalized_limit then
+    raise exception 'The child limit cannot be lower than the number of assigned students.';
+  end if;
+
+  update public.parents
+  set child_limit = normalized_limit
+  where id = target_parent_id
+  returning * into saved_parent;
+
+  if not found then
+    raise exception 'Parent profile was not found.';
+  end if;
+
+  return saved_parent;
 end;
 $$;
 
@@ -733,6 +796,7 @@ grant execute on function public.academy_roster() to anon, authenticated;
 grant execute on function public.claim_parent_profile(text, text) to anon, authenticated;
 grant execute on function public.academy_create_parent(text, text) to anon, authenticated;
 grant execute on function public.academy_create_student(uuid, text, text, integer, text, text) to anon, authenticated;
+grant execute on function public.academy_update_parent_child_limit(uuid, integer) to anon, authenticated;
 grant execute on function public.academy_delete_student(uuid) to anon, authenticated;
 grant execute on function public.academy_delete_parent(uuid) to anon, authenticated;
 

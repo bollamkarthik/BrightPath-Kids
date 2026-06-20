@@ -17,7 +17,7 @@
       <div class="auth-hero">
         <p class="eyebrow">BrightPath portal</p>
         <h1>BrightPath for kids and parents</h1>
-        <p>Parents can add up to two child profiles and review progress. Kids sign in with their name and private child code.</p>
+        <p>Parents can add child profiles up to the academy limit and review progress. Kids sign in with their name and private child code.</p>
         <button class="share-button" type="button" data-share-app>Share app</button>
       </div>
 
@@ -25,25 +25,25 @@
         <form class="auth-card" id="parentLoginForm">
           <span class="auth-badge">Parent</span>
           <h2>Parent login / create account</h2>
-          <label for="parentName">Name</label>
-          <input id="parentName" name="parentName" autocomplete="name" placeholder="Parent name" />
-          <label for="parentEmail">Email</label>
-          <input id="parentEmail" name="parentEmail" autocomplete="email" placeholder="your@email.com" />
-          <label for="parentPassword">Password</label>
-          <input id="parentPassword" name="parentPassword" type="password" autocomplete="current-password" />
+          <label class="required-label" for="parentName">Name</label>
+          <input id="parentName" name="parentName" autocomplete="name" placeholder="Parent name" required />
+          <label class="required-label" for="parentEmail">Email</label>
+          <input id="parentEmail" name="parentEmail" type="email" autocomplete="email" placeholder="your@email.com" required />
+          <label class="required-label" for="parentPassword">Password</label>
+          <input id="parentPassword" name="parentPassword" type="password" autocomplete="current-password" required />
           <button type="submit">Enter or create parent profile</button>
-          <p class="helper-text">New parents can use this same form to create their profile, then add up to two kids.</p>
+          <p class="helper-text">New parents can use this same form to create their profile, then add child profiles allowed by the academy.</p>
         </form>
 
         <form class="auth-card" id="kidLoginForm">
           <span class="auth-badge kid">Kid</span>
           <h2>Kid login</h2>
-          <label for="kidFirstName">First name</label>
-          <input id="kidFirstName" name="kidFirstName" autocomplete="given-name" placeholder="First name" />
-          <label for="kidLastName">Last name</label>
-          <input id="kidLastName" name="kidLastName" autocomplete="family-name" placeholder="Last name" />
-          <label for="kidCode">Child code</label>
-          <input id="kidCode" name="kidCode" autocomplete="off" placeholder="Child code" />
+          <label class="required-label" for="kidFirstName">First name</label>
+          <input id="kidFirstName" name="kidFirstName" autocomplete="given-name" placeholder="First name" required />
+          <label class="required-label" for="kidLastName">Last name</label>
+          <input id="kidLastName" name="kidLastName" autocomplete="family-name" placeholder="Last name" required />
+          <label class="required-label" for="kidCode">Child code</label>
+          <input id="kidCode" name="kidCode" autocomplete="off" placeholder="Child code" required />
           <button type="submit">Start learning</button>
           <p class="helper-text">Use the child code shown in the parent dashboard.</p>
         </form>
@@ -54,10 +54,10 @@
             <strong>If you are the organizer, click here to login.</strong>
           </summary>
           <form class="organizer-form" id="academyLoginForm">
-            <label for="academyEmail">Admin email</label>
-            <input id="academyEmail" name="academyEmail" autocomplete="email" placeholder="owner@example.com" />
-            <label for="academyPassword">Admin password</label>
-            <input id="academyPassword" name="academyPassword" type="password" autocomplete="current-password" />
+            <label class="required-label" for="academyEmail">Admin email</label>
+            <input id="academyEmail" name="academyEmail" type="email" autocomplete="email" placeholder="owner@example.com" required />
+            <label class="required-label" for="academyPassword">Admin password</label>
+            <input id="academyPassword" name="academyPassword" type="password" autocomplete="current-password" required />
             <button type="submit">Open master dashboard</button>
             <p class="helper-text">Only approved academy admin accounts can open the master dashboard.</p>
           </form>
@@ -112,6 +112,7 @@
           <div class="subject-toggle" role="group" aria-label="Subject">
             <button class="subject-button active" type="button" data-subject="math">Math</button>
             <button class="subject-button" type="button" data-subject="english">English</button>
+            <button class="subject-button" type="button" data-subject="fun">Fun</button>
           </div>
 
           <div>
@@ -137,20 +138,20 @@
                 <p class="eyebrow">Child profiles</p>
                 <h2>Add a child</h2>
               </div>
-              <span class="helper-text" id="parentChildLimitNote">0 of 2 profiles used</span>
+              <span class="helper-text" id="parentChildLimitNote">0 profiles used</span>
             </div>
             <form class="add-child-form" id="parentChildForm">
               <div>
-                <label for="parentChildFirstName">First name</label>
-                <input id="parentChildFirstName" name="parentChildFirstName" autocomplete="given-name" placeholder="Example: Leo" />
+                <label class="required-label" for="parentChildFirstName">First name</label>
+                <input id="parentChildFirstName" name="parentChildFirstName" autocomplete="given-name" placeholder="Example: Leo" required />
               </div>
               <div>
-                <label for="parentChildLastName">Last name</label>
-                <input id="parentChildLastName" name="parentChildLastName" autocomplete="family-name" placeholder="Example: Patel" />
+                <label class="required-label" for="parentChildLastName">Last name</label>
+                <input id="parentChildLastName" name="parentChildLastName" autocomplete="family-name" placeholder="Example: Patel" required />
               </div>
               <div>
-                <label for="parentChildAge">Starting level</label>
-                <select id="parentChildAge" name="parentChildAge">
+                <label class="required-label" for="parentChildAge">Starting level</label>
+                <select id="parentChildAge" name="parentChildAge" required>
                   <option value="5">Level 1 (ages 4-6)</option>
                   <option value="8" selected>Level 2 (ages 7-10)</option>
                   <option value="12">Level 3 (ages 11-13)</option>
@@ -158,8 +159,8 @@
                 </select>
               </div>
               <div>
-                <label for="parentChildState">State</label>
-                <select id="parentChildState" name="parentChildState"></select>
+                <label class="required-label" for="parentChildState">State</label>
+                <select id="parentChildState" name="parentChildState" required></select>
               </div>
               <button type="submit">Create child profile</button>
             </form>
@@ -259,31 +260,31 @@
             <div class="academy-create-grid">
               <form class="academy-create-card" id="academyParentForm">
                 <h3>Add parent</h3>
-                <label for="academyParentName">Parent name</label>
-                <input id="academyParentName" name="academyParentName" autocomplete="name" placeholder="Parent full name" />
-                <label for="academyParentEmail">Parent email</label>
-                <input id="academyParentEmail" name="academyParentEmail" autocomplete="email" placeholder="parent@email.com" />
+                <label class="required-label" for="academyParentName">Parent name</label>
+                <input id="academyParentName" name="academyParentName" autocomplete="name" placeholder="Parent full name" required />
+                <label class="required-label" for="academyParentEmail">Parent email</label>
+                <input id="academyParentEmail" name="academyParentEmail" type="email" autocomplete="email" placeholder="parent@email.com" required />
                 <button type="submit">Add parent</button>
                 <p class="helper-text">The parent can create their password from the parent login screen using this email.</p>
               </form>
 
               <form class="academy-create-card" id="academyStudentForm">
                 <h3>Add student</h3>
-                <label for="academyStudentParent">Parent</label>
-                <select id="academyStudentParent" name="academyStudentParent"></select>
-                <label for="academyStudentFirstName">First name</label>
-                <input id="academyStudentFirstName" name="academyStudentFirstName" autocomplete="given-name" placeholder="Student first name" />
-                <label for="academyStudentLastName">Last name</label>
-                <input id="academyStudentLastName" name="academyStudentLastName" autocomplete="family-name" placeholder="Student last name" />
-                <label for="academyStudentAge">Starting level</label>
-                <select id="academyStudentAge" name="academyStudentAge">
+                <label class="required-label" for="academyStudentParent">Parent</label>
+                <select id="academyStudentParent" name="academyStudentParent" required></select>
+                <label class="required-label" for="academyStudentFirstName">First name</label>
+                <input id="academyStudentFirstName" name="academyStudentFirstName" autocomplete="given-name" placeholder="Student first name" required />
+                <label class="required-label" for="academyStudentLastName">Last name</label>
+                <input id="academyStudentLastName" name="academyStudentLastName" autocomplete="family-name" placeholder="Student last name" required />
+                <label class="required-label" for="academyStudentAge">Starting level</label>
+                <select id="academyStudentAge" name="academyStudentAge" required>
                   <option value="5">Level 1 (ages 4-6)</option>
                   <option value="8" selected>Level 2 (ages 7-10)</option>
                   <option value="12">Level 3 (ages 11-13)</option>
                   <option value="15">Level 4 (ages 14+)</option>
                 </select>
-                <label for="academyStudentState">State</label>
-                <select id="academyStudentState" name="academyStudentState"></select>
+                <label class="required-label" for="academyStudentState">State</label>
+                <select id="academyStudentState" name="academyStudentState" required></select>
                 <button type="submit">Add student</button>
               </form>
             </div>
