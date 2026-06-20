@@ -11,7 +11,8 @@ const appState = {
   startedAt: Date.now(),
   parentQuestionId: null,
   parentTestGroupId: null,
-  parentQuestionJustCompleted: false
+  parentQuestionJustCompleted: false,
+  completedTestReport: null
 };
 
 const dashboardState = {
@@ -2754,6 +2755,53 @@ function normalize(value) {
   return value.trim().toLowerCase().replace(/\s+/g, "").replace(/,$/, "");
 }
 
+function normalizeNumberLike(value) {
+  const text = String(value || "").trim().replace(/,/g, "");
+  if (!text) return null;
+
+  const normalized = text.startsWith(".") ? `0${text}` : text;
+  if (!/^-?\d*\.?\d+%?$/.test(normalized)) return null;
+
+  const isPercent = normalized.endsWith("%");
+  const numericValue = Number((isPercent ? normalized.slice(0, -1) : normalized));
+  return Number.isFinite(numericValue)
+    ? { value: numericValue, isPercent }
+    : null;
+}
+
+function isAnswerCorrect(submittedAnswer, correctAnswer) {
+  const submittedNumber = normalizeNumberLike(submittedAnswer);
+  const correctNumber = normalizeNumberLike(correctAnswer);
+
+  if (submittedNumber && correctNumber && submittedNumber.isPercent === correctNumber.isPercent) {
+    return Math.abs(submittedNumber.value - correctNumber.value) < 0.000001;
+  }
+
+  return normalize(submittedAnswer) === normalize(correctAnswer);
+}
+
+function encodeParentQuestionPrompt(senderLabel, prompt) {
+  return `From ${senderLabel}: ${prompt}`;
+}
+
+function parseParentQuestionPrompt(prompt = "") {
+  const match = String(prompt).match(/^From ([^:]+):\s*(.*)$/);
+  return {
+    sender: match ? match[1].trim() : "",
+    prompt: match ? match[2].trim() : String(prompt || "").trim()
+  };
+}
+
+function getParentQuestionSenderLabel(question) {
+  const parsed = parseParentQuestionPrompt(question && question.prompt);
+  if (parsed.sender) return parsed.sender;
+  return question && question.parentId ? getParentName(question.parentId) : "Parent";
+}
+
+function getParentQuestionDisplayPrompt(question) {
+  return parseParentQuestionPrompt(question && question.prompt).prompt;
+}
+
 function triggerCelebration() {
   if (!celebrationLayer) return;
 
@@ -3856,12 +3904,13 @@ function getCurrentTrack() {
       ? activeGroup.answered.length + 1
       : 1;
     const groupPrompt = activeGroup
-      ? `${activeGroup.timedChallenge ? "Timed challenge" : "Challenge"} question ${groupPosition} of ${activeGroup.questions.length}`
+      ? `Question ${groupPosition} of ${activeGroup.questions.length}`
       : "";
+    const senderLabel = parentQuestion ? getParentQuestionSenderLabel(parentQuestion) : "Parent";
     const question = parentQuestion
       ? {
-        title: activeGroup && activeGroup.timedChallenge ? "Timed challenge" : "Parent check",
-        prompt: groupPrompt || parentQuestion.prompt || `${subjectLabel} question from your parent`,
+        title: `Test (${senderLabel})`,
+        prompt: groupPrompt || getParentQuestionDisplayPrompt(parentQuestion) || `${subjectLabel} question from ${senderLabel}`,
         text: parentQuestion.question,
         answer: parentQuestion.answer,
         hint: parentQuestion.explanation || "Think through the question carefully, then compare with the correct answer.",
@@ -3976,6 +4025,65 @@ function getAnswerExplanation(question, submittedAnswer) {
   return `Your answer was ${kidAnswer}. The correct answer is ${question.answer}. Why: ${why}`;
 }
 
+function buildParentTestReport({ childId, groupId = "", questionId = "" }) {
+  const questions = groupId
+    ? (demoData.parentQuestions || [])
+      .filter((question) => question.childId === childId && question.testGroupId === groupId)
+      .sort((a, b) => a.createdAt - b.createdAt)
+    : (demoData.parentQuestions || []).filter((question) => question.id === questionId);
+  const answered = questions.filter((question) => question.status === "answered");
+  const correct = answered.filter((question) => question.correct).length;
+  const sender = questions[0] ? getParentQuestionSenderLabel(questions[0]) : "Parent";
+
+  return {
+    sender,
+    total: questions.length,
+    answered: answered.length,
+    correct,
+    wrong: Math.max(0, answered.length - correct),
+    questions
+  };
+}
+
+function renderCompletedTestReport(report) {
+  if (!report) return;
+
+  const accuracy = report.answered ? Math.round((report.correct / report.answered) * 100) : 0;
+  const rows = report.questions.map((question, index) => {
+    const why = question.explanation || "Review this question with your parent or teacher.";
+    return `
+      <article class="test-review-row ${question.correct ? "is-correct" : "needs-review"}">
+        <div>
+          <strong>${index + 1}. ${escapeHtml(question.question)}</strong>
+          <span>${question.correct ? "Right" : "Wrong"} - ${escapeHtml(why)}</span>
+        </div>
+        <div>
+          <small>Your answer</small>
+          <b>${escapeHtml(question.childAnswer || "blank")}</b>
+        </div>
+        <div>
+          <small>Correct answer</small>
+          <b>${escapeHtml(question.answer)}</b>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  questionTitle.textContent = `Test complete (${report.sender})`;
+  questionPrompt.textContent = `Score: ${report.correct}/${report.answered} (${accuracy}%)`;
+  questionText.innerHTML = `
+    <section class="test-complete-report">
+      <p>Thank you for taking the test. Your answers will be reviewed by your parent/master.</p>
+      <div class="test-review-list">${rows}</div>
+    </section>
+  `;
+  answerInput.value = "";
+  answerForm.classList.add("hidden");
+  nextButton.textContent = "Back to practice";
+  feedback.className = accuracy >= 80 ? "feedback correct" : "feedback needs-work";
+  feedback.textContent = `${report.correct} right and ${report.wrong} wrong.`;
+}
+
 function renderTopicSelect() {
   const child = getCurrentChild();
   const pendingGroups = getPendingParentQuestionGroups(child);
@@ -3991,12 +4099,12 @@ function renderTopicSelect() {
 
   const groupOptions = pendingGroups.map((group) => `
     <option value="testgroup:${escapeHtml(group.groupId)}" ${appState.parentTestGroupId === group.groupId ? "selected" : ""}>
-      ${escapeHtml(`${group.timedChallenge ? "Timed " : ""}${getSubjectLabel(group.subject)} challenge: ${group.answered.length}/${group.questions.length} done`)}
+      ${escapeHtml(`Test (${getParentQuestionSenderLabel(group.questions[0])}): ${group.answered.length}/${group.questions.length} done`)}
     </option>
   `).join("");
   const singleOptions = pendingTests.map((question, index) => `
     <option value="test:${escapeHtml(question.id)}" ${appState.parentQuestionId === question.id ? "selected" : ""}>
-      ${escapeHtml(`${getSubjectLabel(question.subject)} test ${index + 1}: ${question.question}`)}
+      ${escapeHtml(`Test (${getParentQuestionSenderLabel(question)}) ${index + 1}: ${question.question}`)}
     </option>
   `).join("");
   const testOptions = pendingGroups.length || pendingTests.length
@@ -4021,6 +4129,8 @@ function renderTopicSelect() {
 
 function syncLearnerMode() {
   const child = getCurrentChild();
+  if (appState.mode === "test-complete" && appState.completedTestReport) return;
+
   const parentGroupQuestion = appState.parentTestGroupId
     ? getPendingParentQuestionInGroup(child, appState.parentTestGroupId)
     : null;
@@ -4246,6 +4356,12 @@ function render() {
     return;
   }
 
+  if (appState.mode === "test-complete" && appState.completedTestReport) {
+    renderTopicSelect();
+    renderCompletedTestReport(appState.completedTestReport);
+    return;
+  }
+
   syncLearnerMode();
   const track = getCurrentTrack();
   const question = getCurrentQuestion();
@@ -4259,6 +4375,13 @@ function render() {
   questionTitle.textContent = question.title;
   questionPrompt.textContent = question.prompt;
   questionText.textContent = question.text;
+  answerForm.classList.remove("hidden");
+  answerInput.disabled = false;
+  const answerSubmitButton = answerForm.querySelector("button[type='submit']");
+  if (answerSubmitButton) {
+    answerSubmitButton.disabled = false;
+  }
+  nextButton.textContent = "Next";
   answerInput.value = "";
   const elapsed = Math.max(0, Math.round((Date.now() - appState.startedAt) / 1000));
   const timerText = appState.mode === "timed" ? `, ${elapsed}s` : "";
@@ -4321,7 +4444,9 @@ kidLoginForm.addEventListener("submit", async (event) => {
     appState.practiceRound = 0;
     appState.startedAt = Date.now();
     appState.parentQuestionId = null;
+    appState.parentTestGroupId = null;
     appState.parentQuestionJustCompleted = false;
+    appState.completedTestReport = null;
     saveSession();
     authMessage.textContent = "";
     render();
@@ -4526,6 +4651,7 @@ parentQuestionForm.addEventListener("submit", async (event) => {
     const sharedTestGroupId = count > 1
       ? `${timedChallenge ? "challenge" : "test"}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
       : "";
+    const senderLabel = isAcademy ? "Master" : parent.name;
 
     for (const child of selectedChildren) {
       const ageGroup = selectedLevel === "all" ? getAgeGroup(child.age) : selectedLevel;
@@ -4538,7 +4664,10 @@ parentQuestionForm.addEventListener("submit", async (event) => {
           parentId: isAcademy ? child.parentId : parent.id,
           childId: child.id,
           subject: item.subject,
-          prompt: questions.length > 1 ? `${item.prompt} (${item.order || 1}/${questions.length})` : item.prompt,
+          prompt: encodeParentQuestionPrompt(
+            senderLabel,
+            questions.length > 1 ? `${item.prompt} (${item.order || 1}/${questions.length})` : item.prompt
+          ),
           question: item.question,
           answer: item.answer,
           explanation: item.explanation,
@@ -4553,7 +4682,13 @@ parentQuestionForm.addEventListener("submit", async (event) => {
     resetParentQuestionDraft();
     renderParentQuestionTopicOptions();
     renderParentQuestionMode();
-    authMessage.textContent = `${sentCount} question${sentCount === 1 ? "" : "s"} sent${sendAll ? " to all matching students" : ""}.`;
+    const recipientNames = selectedChildren.map((child) => child.name);
+    const recipientText = sendAll
+      ? `all ${selectedChildren.length} matching students`
+      : recipientNames.length <= 4
+        ? recipientNames.join(", ")
+        : `${recipientNames.slice(0, 4).join(", ")} and ${recipientNames.length - 4} more`;
+    authMessage.textContent = `Test sent to ${recipientText}: ${sentCount} question${sentCount === 1 ? "" : "s"}.`;
     renderParentDashboard();
   } catch (error) {
     authMessage.textContent = getDatabaseErrorMessage(error);
@@ -4742,6 +4877,7 @@ topicSelect.addEventListener("change", async () => {
   appState.practiceRound = 0;
   appState.startedAt = Date.now();
   appState.parentQuestionJustCompleted = false;
+  appState.completedTestReport = null;
   render();
   document.querySelector("#practice").scrollIntoView({ behavior: "smooth", block: "start" });
   answerInput.focus();
@@ -4761,6 +4897,7 @@ subjectButtons.forEach((button) => {
     appState.parentQuestionId = null;
     appState.parentTestGroupId = null;
     appState.parentQuestionJustCompleted = false;
+    appState.completedTestReport = null;
     render();
   });
 });
@@ -4772,14 +4909,15 @@ shareButtons.forEach((button) => {
 answerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const question = getCurrentQuestion();
-  const isCorrect = normalize(answerInput.value) === normalize(question.answer);
+  const submittedAnswer = answerInput.value;
+  const isCorrect = isAnswerCorrect(submittedAnswer, question.answer);
   const child = getCurrentChild();
 
   feedback.classList.toggle("correct", isCorrect);
   feedback.classList.toggle("needs-work", !isCorrect);
   feedback.textContent = isCorrect
     ? "Correct. Nice steady work."
-    : getAnswerExplanation(question, answerInput.value);
+    : getAnswerExplanation(question, submittedAnswer);
 
   if (isCorrect) {
     appState.correct += 1;
@@ -4801,7 +4939,7 @@ answerForm.addEventListener("submit", async (event) => {
       skill: question.skill || appState.path || appState.mode,
       difficulty: question.difficulty || "medium",
       question: question.text,
-      answer: answerInput.value,
+      answer: submittedAnswer,
       correctAnswer: question.answer,
       explanation: question.explanation || question.hint || "",
       correct: isCorrect,
@@ -4811,10 +4949,15 @@ answerForm.addEventListener("submit", async (event) => {
     demoData.attempts.push(attempt);
 
     if (question.parentQuestionId) {
+      answerInput.disabled = true;
+      const answerSubmitButton = answerForm.querySelector("button[type='submit']");
+      if (answerSubmitButton) {
+        answerSubmitButton.disabled = true;
+      }
       const activeParentQuestion = getParentQuestionById(question.parentQuestionId);
       const activeGroupId = appState.parentTestGroupId || (activeParentQuestion ? activeParentQuestion.testGroupId : "");
       try {
-        await markParentQuestionAnswered(question.parentQuestionId, answerInput.value, isCorrect);
+        await markParentQuestionAnswered(question.parentQuestionId, submittedAnswer, isCorrect);
       } catch (error) {
         feedback.className = "feedback needs-work";
         feedback.textContent = `Answer checked, but the parent question status did not save yet: ${getDatabaseErrorMessage(error)}`;
@@ -4827,25 +4970,27 @@ answerForm.addEventListener("submit", async (event) => {
         appState.parentQuestionId = nextGroupQuestion.id;
         appState.parentTestGroupId = activeGroupId;
         appState.subject = nextGroupQuestion.subject;
+        appState.parentQuestionJustCompleted = false;
+        window.setTimeout(() => {
+          render();
+          answerInput.focus();
+        }, isCorrect ? 650 : 1800);
       } else {
-        const completedSubject = appState.subject;
-        appState.mode = "practice";
+        appState.completedTestReport = buildParentTestReport({
+          childId: child.id,
+          groupId: activeGroupId,
+          questionId: question.parentQuestionId
+        });
+        appState.mode = "test-complete";
         appState.parentQuestionId = null;
         appState.parentTestGroupId = null;
-        if (completedSubject === "fun") {
-          appState.subject = "fun";
-          appState.path = skills.fun[0].key;
-        } else if (!content[completedSubject]) {
-          appState.subject = "math";
-          appState.path = null;
-        }
         appState.index = 0;
-        appState.correct = 0;
-        appState.answered = 0;
-        appState.practiceRound = 0;
         appState.startedAt = Date.now();
+        appState.parentQuestionJustCompleted = false;
+        window.setTimeout(() => {
+          render();
+        }, isCorrect ? 650 : 1800);
       }
-      appState.parentQuestionJustCompleted = true;
     }
 
     if (isPlacementComplete) {
@@ -4882,6 +5027,19 @@ hintButton.addEventListener("click", () => {
 });
 
 nextButton.addEventListener("click", () => {
+  if (appState.mode === "test-complete") {
+    appState.mode = "practice";
+    appState.completedTestReport = null;
+    appState.index = 0;
+    appState.correct = 0;
+    appState.answered = 0;
+    appState.practiceRound = 0;
+    appState.startedAt = Date.now();
+    render();
+    answerInput.focus();
+    return;
+  }
+
   if (appState.parentQuestionJustCompleted) {
     appState.parentQuestionJustCompleted = false;
     render();
