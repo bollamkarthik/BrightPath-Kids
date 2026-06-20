@@ -4,15 +4,16 @@ create table if not exists public.parents (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   email text not null unique,
-  child_limit integer not null default 2,
+  child_limit integer not null default 999999,
   created_at timestamptz not null default now()
 );
 
 alter table public.parents drop constraint if exists parents_id_fkey;
 alter table public.parents add column if not exists auth_user_id uuid references auth.users(id) on delete set null;
-alter table public.parents add column if not exists child_limit integer not null default 2;
+alter table public.parents add column if not exists child_limit integer not null default 999999;
 alter table public.parents drop constraint if exists parents_child_limit_check;
-alter table public.parents add constraint parents_child_limit_check check (child_limit between 1 and 20);
+alter table public.parents add constraint parents_child_limit_check check (child_limit >= 1);
+update public.parents set child_limit = 999999 where child_limit < 999999;
 create unique index if not exists parents_auth_user_id_key on public.parents(auth_user_id) where auth_user_id is not null;
 update public.parents
 set auth_user_id = id
@@ -652,8 +653,6 @@ set search_path = public
 as $$
 declare
   saved_student public.students%rowtype;
-  existing_count integer;
-  allowed_count integer;
   base_code text;
   final_code text;
 begin
@@ -663,20 +662,6 @@ begin
 
   if not exists (select 1 from public.parents where id = target_parent_id) then
     raise exception 'Choose an existing parent before adding a student.';
-  end if;
-
-  select count(*)
-  into existing_count
-  from public.students
-  where parent_id = target_parent_id;
-
-  select child_limit
-  into allowed_count
-  from public.parents
-  where id = target_parent_id;
-
-  if existing_count >= allowed_count then
-    raise exception 'This parent has reached their child profile limit.';
   end if;
 
   if nullif(trim(student_first_name), '') is null or nullif(trim(student_last_name), '') is null then
@@ -731,7 +716,7 @@ begin
     raise exception 'This account is not an academy admin.';
   end if;
 
-  normalized_limit := least(20, greatest(1, coalesce(new_child_limit, 2)));
+  normalized_limit := greatest(1, coalesce(new_child_limit, 999999));
 
   select count(*)
   into existing_count
