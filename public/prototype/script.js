@@ -1637,6 +1637,8 @@ async function deleteChildProfile(childId) {
     });
     if (error) throw error;
   } else if (hasDatabaseConnection() && isDatabaseUuid(childId)) {
+    await supabaseClient.from("parent_questions").delete().eq("child_id", childId);
+    await supabaseClient.from("attempts").delete().eq("child_id", childId);
     const { error } = await supabaseClient.from("students").delete().eq("id", childId);
     if (error && (!session || session.role !== "academy")) throw error;
   }
@@ -1652,6 +1654,16 @@ async function deleteParentProfile(parentId) {
     });
     if (error) throw error;
   } else if (hasDatabaseConnection() && isDatabaseUuid(parentId)) {
+    const childIds = demoData.children
+      .filter((child) => child.parentId === parentId && isDatabaseUuid(child.id))
+      .map((child) => child.id);
+
+    if (childIds.length) {
+      await supabaseClient.from("parent_questions").delete().in("child_id", childIds);
+      await supabaseClient.from("attempts").delete().in("child_id", childIds);
+      await supabaseClient.from("students").delete().in("id", childIds);
+    }
+    await supabaseClient.from("parent_questions").delete().eq("parent_id", parentId);
     const { error } = await supabaseClient.from("parents").delete().eq("id", parentId);
     if (error && (!session || session.role !== "academy")) throw error;
   }
@@ -5244,7 +5256,8 @@ academyManagement.addEventListener("click", async (event) => {
 
   if (parentButton) {
     const parentId = parentButton.dataset.deleteParent;
-    const parentName = getParentName(parentId);
+    const parent = demoData.parents.find((item) => item.id === parentId);
+    const parentName = parent ? parent.name : "this parent";
     if (window.confirm(`Delete ${parentName} and all assigned students?`)) {
       try {
         await deleteParentProfile(parentId);
