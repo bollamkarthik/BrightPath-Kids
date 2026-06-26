@@ -76,6 +76,21 @@ create table if not exists public.parent_questions (
   challenge_finished_at timestamptz
 );
 
+alter table public.attempts drop constraint if exists attempts_child_id_fkey;
+alter table public.attempts
+  add constraint attempts_child_id_fkey
+  foreign key (child_id) references public.students(id) on delete cascade;
+
+alter table public.parent_questions drop constraint if exists parent_questions_parent_id_fkey;
+alter table public.parent_questions
+  add constraint parent_questions_parent_id_fkey
+  foreign key (parent_id) references public.parents(id) on delete cascade;
+
+alter table public.parent_questions drop constraint if exists parent_questions_child_id_fkey;
+alter table public.parent_questions
+  add constraint parent_questions_child_id_fkey
+  foreign key (child_id) references public.students(id) on delete cascade;
+
 alter table public.parent_questions add column if not exists test_group_id text;
 alter table public.parent_questions add column if not exists timed_challenge boolean not null default false;
 alter table public.parent_questions add column if not exists challenge_started_at timestamptz;
@@ -780,6 +795,12 @@ begin
     raise exception 'This account is not an academy admin.';
   end if;
 
+  delete from public.parent_questions
+  where child_id = target_student_id;
+
+  delete from public.attempts
+  where child_id = target_student_id;
+
   delete from public.students
   where id = target_student_id;
 end;
@@ -797,6 +818,20 @@ begin
   if not public.is_academy_admin() then
     raise exception 'This account is not an academy admin.';
   end if;
+
+  delete from public.parent_questions
+  where parent_id = target_parent_id
+     or child_id in (
+      select id from public.students where parent_id = target_parent_id
+    );
+
+  delete from public.attempts
+  where child_id in (
+    select id from public.students where parent_id = target_parent_id
+  );
+
+  delete from public.students
+  where parent_id = target_parent_id;
 
   delete from public.parents
   where id = target_parent_id;
