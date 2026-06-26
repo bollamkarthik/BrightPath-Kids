@@ -49,8 +49,12 @@ create table if not exists public.attempts (
   correct_answer text not null,
   explanation text,
   correct boolean not null,
+  answered_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.attempts add column if not exists answered_at timestamptz;
+update public.attempts set answered_at = created_at where answered_at is null;
 
 create table if not exists public.parent_questions (
   id uuid primary key default gen_random_uuid(),
@@ -302,17 +306,24 @@ set search_path = public
 as $$
 declare
   saved_parent public.parents%rowtype;
+  normalized_email text;
 begin
   if auth.uid() is null then
     raise exception 'Login required.';
+  end if;
+
+  normalized_email := lower(trim(parent_email));
+
+  if nullif(normalized_email, '') is null then
+    raise exception 'Parent email is required.';
   end if;
 
   update public.parents
   set
     auth_user_id = auth.uid(),
     name = coalesce(nullif(trim(parent_name), ''), parents.name),
-    email = lower(trim(parent_email))
-  where lower(email) = lower(trim(parent_email))
+    email = normalized_email
+  where lower(email) = normalized_email
     and (auth_user_id is null or auth_user_id = auth.uid() or id = auth.uid())
   returning * into saved_parent;
 
@@ -325,9 +336,20 @@ begin
     auth.uid(),
     auth.uid(),
     coalesce(nullif(trim(parent_name), ''), 'Parent'),
-    lower(trim(parent_email))
+    normalized_email
   )
+  on conflict (email) do update
+  set
+    auth_user_id = auth.uid(),
+    name = coalesce(nullif(trim(parent_name), ''), parents.name)
+  where parents.auth_user_id is null
+    or parents.auth_user_id = auth.uid()
+    or parents.id = auth.uid()
   returning * into saved_parent;
+
+  if not found then
+    raise exception 'This parent email is already linked to another login.';
+  end if;
 
   return saved_parent;
 end;
@@ -383,6 +405,8 @@ begin
 end;
 $$;
 
+drop function if exists public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, jsonb);
+
 create or replace function public.submit_student_attempt(
   student_id uuid,
   student_code text,
@@ -397,6 +421,7 @@ create or replace function public.submit_student_attempt(
   attempt_explanation text,
   attempt_correct boolean,
   attempt_created_at timestamptz,
+  attempt_answered_at timestamptz default null,
   student_placement jsonb default null
 )
 returns jsonb
@@ -431,6 +456,7 @@ begin
     correct_answer,
     explanation,
     correct,
+    answered_at,
     created_at
   )
   values (
@@ -445,6 +471,7 @@ begin
     attempt_correct_answer,
     attempt_explanation,
     attempt_correct,
+    coalesce(attempt_answered_at, attempt_created_at, now()),
     coalesce(attempt_created_at, now())
   )
   returning * into saved_attempt;
@@ -542,7 +569,7 @@ end;
 $$;
 
 grant execute on function public.student_portal_by_code(text, text, text) to anon, authenticated;
-grant execute on function public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, jsonb) to anon, authenticated;
+grant execute on function public.submit_student_attempt(uuid, text, text, text, text, text, text, text, text, text, text, boolean, timestamptz, timestamptz, jsonb) to anon, authenticated;
 grant execute on function public.complete_parent_question(uuid, text, text, boolean, timestamptz) to anon, authenticated;
 grant execute on function public.start_parent_question_group(text, text, timestamptz) to anon, authenticated;
 
