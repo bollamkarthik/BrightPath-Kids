@@ -322,27 +322,47 @@ as $$
 declare
   saved_parent public.parents%rowtype;
   normalized_email text;
+  normalized_name text;
 begin
   if auth.uid() is null then
     raise exception 'Login required.';
   end if;
 
   normalized_email := lower(trim(parent_email));
+  normalized_name := lower(regexp_replace(trim(coalesce(parent_name, '')), '\s+', ' ', 'g'));
 
   if nullif(normalized_email, '') is null then
     raise exception 'Parent email is required.';
   end if;
 
-  update public.parents
-  set
-    auth_user_id = auth.uid(),
-    name = coalesce(nullif(trim(parent_name), ''), parents.name),
-    email = normalized_email
+  if nullif(normalized_name, '') is null then
+    raise exception 'Parent name is required.';
+  end if;
+
+  select *
+  into saved_parent
+  from public.parents
   where lower(email) = normalized_email
-    and (auth_user_id is null or auth_user_id = auth.uid() or id = auth.uid())
-  returning * into saved_parent;
+  limit 1;
 
   if found then
+    if lower(regexp_replace(trim(saved_parent.name), '\s+', ' ', 'g')) <> normalized_name then
+      raise exception 'That email is already linked to a different parent name.';
+    end if;
+
+    if saved_parent.auth_user_id is not null
+      and saved_parent.auth_user_id <> auth.uid()
+      and saved_parent.id <> auth.uid() then
+      raise exception 'This parent email is already linked to another login.';
+    end if;
+
+    update public.parents
+    set
+      auth_user_id = coalesce(auth_user_id, auth.uid()),
+      email = normalized_email
+    where id = saved_parent.id
+    returning * into saved_parent;
+
     return saved_parent;
   end if;
 
@@ -350,21 +370,10 @@ begin
   values (
     auth.uid(),
     auth.uid(),
-    coalesce(nullif(trim(parent_name), ''), 'Parent'),
+    regexp_replace(trim(parent_name), '\s+', ' ', 'g'),
     normalized_email
   )
-  on conflict (email) do update
-  set
-    auth_user_id = auth.uid(),
-    name = coalesce(nullif(trim(parent_name), ''), parents.name)
-  where parents.auth_user_id is null
-    or parents.auth_user_id = auth.uid()
-    or parents.id = auth.uid()
   returning * into saved_parent;
-
-  if not found then
-    raise exception 'This parent email is already linked to another login.';
-  end if;
 
   return saved_parent;
 end;
@@ -670,10 +679,12 @@ begin
     raise exception 'Parent name and email are required.';
   end if;
 
+  if exists (select 1 from public.parents where lower(email) = lower(trim(parent_email))) then
+    raise exception 'A parent with this email already exists.';
+  end if;
+
   insert into public.parents (id, name, email)
   values (gen_random_uuid(), trim(parent_name), lower(trim(parent_email)))
-  on conflict (email) do update
-  set name = excluded.name
   returning * into saved_parent;
 
   return saved_parent;
