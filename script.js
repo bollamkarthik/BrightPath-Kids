@@ -1130,8 +1130,13 @@ async function signInAcademyAdmin({ email, password }) {
 
 async function signInOrCreateParent({ name, email, password }) {
   let localParent = demoData.parents.find((item) => item.email === email);
+  const namesMatch = (parent) => parent && parent.name.trim().toLowerCase() === name.trim().toLowerCase();
 
   if (!hasDatabaseConnection()) {
+    if (localParent && !namesMatch(localParent)) {
+      throw new Error("That email is already linked to a different parent name.");
+    }
+
     if (localParent && localParent.password && localParent.password !== password) {
       throw new Error("That password does not match this parent account.");
     }
@@ -1153,9 +1158,17 @@ async function signInOrCreateParent({ name, email, password }) {
     return localParent;
   }
 
+  if (localParent && !namesMatch(localParent)) {
+    throw new Error("That email is already linked to a different parent name.");
+  }
+
   let authResult = await supabaseClient.auth.signInWithPassword({ email, password });
 
   if (authResult.error) {
+    if (localParent) {
+      throw new Error("That password does not match this parent account.");
+    }
+
     authResult = await supabaseClient.auth.signUp({
       email,
       password,
@@ -1181,6 +1194,7 @@ async function signInOrCreateParent({ name, email, password }) {
     });
 
   if (error) {
+    await supabaseClient.auth.signOut();
     throw error;
   }
 
@@ -1349,9 +1363,7 @@ async function createAcademyParentProfile({ name, email }) {
   if (!hasDatabaseConnection()) {
     const existingParent = demoData.parents.find((parent) => parent.email.toLowerCase() === email.toLowerCase());
     if (existingParent) {
-      existingParent.name = name;
-      saveDemoData();
-      return existingParent;
+      throw new Error("A parent with this email already exists.");
     }
 
     const parent = {
