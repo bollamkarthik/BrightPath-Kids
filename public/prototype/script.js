@@ -17,12 +17,15 @@ const appState = {
 
 const dashboardState = {
   historyDateByChild: {},
-  academyStudentSearch: ""
+  academyStudentSearch: "",
+  activeReview: null
 };
 
 const parentQuestionDraft = {
   key: "",
-  questions: []
+  questions: [],
+  reviewing: false,
+  refreshCount: 0
 };
 
 const MAX_PARENT_TEST_QUESTIONS = 200;
@@ -983,6 +986,7 @@ function mapAttemptFromRow(row) {
     correctAnswer: row.correct_answer,
     explanation: row.explanation || "",
     correct: row.correct,
+    answeredAt: row.answered_at ? new Date(row.answered_at).getTime() : new Date(row.created_at).getTime(),
     createdAt: new Date(row.created_at).getTime()
   };
 }
@@ -1127,15 +1131,15 @@ async function signInAcademyAdmin({ email, password }) {
 async function signInOrCreateParent({ name, email, password }) {
   let localParent = demoData.parents.find((item) => item.email === email);
 
-  if (localParent && localParent.password && localParent.password !== password) {
-    throw new Error("That password does not match this parent account.");
-  }
-
-  if (localParent && localParent.password === password) {
-    return localParent;
-  }
-
   if (!hasDatabaseConnection()) {
+    if (localParent && localParent.password && localParent.password !== password) {
+      throw new Error("That password does not match this parent account.");
+    }
+
+    if (localParent && localParent.password === password) {
+      return localParent;
+    }
+
     if (localParent && !localParent.password) {
       localParent.name = name || localParent.name;
       localParent.password = password;
@@ -1167,10 +1171,7 @@ async function signInOrCreateParent({ name, email, password }) {
   const activeSession = authResult.data.session;
 
   if (!user || !activeSession) {
-    localParent = { id: `parent-${Date.now()}`, name, email, password, needsEmailConfirmation: true, childLimit: UNLIMITED_CHILD_LIMIT };
-    demoData.parents.push(localParent);
-    saveDemoData();
-    return localParent;
+    throw new Error("Parent account was created, but email confirmation is required before logging in. Check the parent's email, confirm it, then log in again.");
   }
 
   const { data: parentRow, error } = await supabaseClient
@@ -1184,7 +1185,13 @@ async function signInOrCreateParent({ name, email, password }) {
   }
 
   await loadDatabaseData();
-  return mapParentFromRow(parentRow);
+  const claimedParent = mapParentFromRow(parentRow);
+  demoData.parents = [
+    ...demoData.parents.filter((item) => item.id !== claimedParent.id && item.email.toLowerCase() !== claimedParent.email.toLowerCase()),
+    claimedParent
+  ];
+  saveDemoData();
+  return claimedParent;
 }
 
 async function signInChildWithCode({ firstName, lastName, code }) {
@@ -1672,6 +1679,7 @@ async function saveAttemptToDatabase(attempt, child) {
       attempt_explanation: attempt.explanation,
       attempt_correct: attempt.correct,
       attempt_created_at: new Date(attempt.createdAt).toISOString(),
+      attempt_answered_at: new Date(attempt.answeredAt || attempt.createdAt).toISOString(),
       student_placement: child && child.placement ? child.placement : null
     });
 
@@ -1694,6 +1702,7 @@ async function saveAttemptToDatabase(attempt, child) {
     correct_answer: attempt.correctAnswer,
     explanation: attempt.explanation,
     correct: attempt.correct,
+    answered_at: new Date(attempt.answeredAt || attempt.createdAt).toISOString(),
     created_at: new Date(attempt.createdAt).toISOString()
   });
 
@@ -2119,9 +2128,13 @@ function renderParentQuestionManager(parent, isAcademy = false) {
   if (parentQuestionChild && parentQuestionSendAll) {
     parentQuestionChild.disabled = Boolean(isAcademy && parentQuestionSendAll.checked);
   }
+  const previousSelectedIds = new Set(Array.from(parentQuestionChild.selectedOptions || []).map((option) => option.value));
   parentQuestionChild.innerHTML = filteredChildren.map((child) => `
-    <option value="${escapeHtml(child.id)}">${escapeHtml(child.name)}${isAcademy ? ` - ${escapeHtml(getParentName(child.parentId))}` : ""}</option>
+    <option value="${escapeHtml(child.id)}" ${previousSelectedIds.has(child.id) ? "selected" : ""}>${escapeHtml(child.name)}${isAcademy ? ` - ${escapeHtml(getParentName(child.parentId))}` : ""}</option>
   `).join("") || "<option value=\"\" disabled>No students match this level</option>";
+  if (!parentQuestionChild.disabled && filteredChildren.length && !parentQuestionChild.selectedOptions.length) {
+    parentQuestionChild.options[0].selected = true;
+  }
   renderParentQuestionTopicOptions();
   renderParentQuestionMode();
   renderTimedChallengeBoard(children);
@@ -2144,6 +2157,63 @@ function formatDuration(milliseconds) {
   const seconds = totalSeconds % 60;
 
   return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+function updateQuestionTimer() {
+  if (!questionTimer || !session || session.role !== "kid" || appState.mode === "test-complete") {
+    if (questionTimer) questionTimer.textContent = "";
+    return;
+  }
+
+  questionTimer.textContent = formatDuration(Date.now() - appState.startedAt);
+}
+
+function formatClockTime(timestamp) {
+  if (!timestamp) return "Not answered yet";
+
+  return new Date(timestamp).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function getParentQuestionAnswerDuration(question) {
+  if (!question || !question.answeredAt) return "";
+
+  const startedAt = question.challengeStartedAt || question.createdAt;
+  const duration = question.answeredAt - startedAt;
+  return duration > 0 ? formatDuration(duration) : "";
+}
+
+function getLatestCompletedTestTime(childId) {
+  const completedQuestions = getChildParentQuestions(childId)
+    .filter((question) => question.status === "answered" && question.answeredAt)
+    .sort((a, b) => b.answeredAt - a.answeredAt);
+
+  if (!completedQuestions.length) {
+    return { label: "No timed test yet", value: Number.MAX_SAFE_INTEGER };
+  }
+
+  const latest = completedQuestions[0];
+
+  if (latest.testGroupId) {
+    const groupQuestions = getChildParentQuestions(childId)
+      .filter((question) => question.testGroupId === latest.testGroupId && question.status === "answered" && question.answeredAt);
+    const firstStartedAt = Math.min(...groupQuestions.map((question) => question.challengeStartedAt || question.createdAt));
+    const lastAnsweredAt = Math.max(...groupQuestions.map((question) => question.answeredAt));
+    const duration = lastAnsweredAt - firstStartedAt;
+
+    return {
+      label: duration > 0 ? formatDuration(duration) : "No timed test yet",
+      value: duration > 0 ? duration : Number.MAX_SAFE_INTEGER
+    };
+  }
+
+  const duration = latest.answeredAt - latest.createdAt;
+  return {
+    label: duration > 0 ? formatDuration(duration) : "No timed test yet",
+    value: duration > 0 ? duration : Number.MAX_SAFE_INTEGER
+  };
 }
 
 function renderTimedChallengeBoard(children) {
@@ -2242,6 +2312,7 @@ function getParentQuestionPreviewLevel() {
 function getParentQuestionFormConfig() {
   const subject = parentQuestionSubject ? parentQuestionSubject.value || "math" : "math";
   const selectedLevel = parentQuestionLevel ? parentQuestionLevel.value || "all" : "all";
+  const complexity = parentQuestionComplexity ? parentQuestionComplexity.value || "medium" : "medium";
   const path = parentQuestionPath ? parentQuestionPath.value || skills[subject][0].key : skills[subject][0].key;
   const count = parentQuestionCount
     ? Math.min(MAX_PARENT_TEST_QUESTIONS, Math.max(1, Number(parentQuestionCount.value || 5)))
@@ -2256,7 +2327,7 @@ function getParentQuestionFormConfig() {
     : `Complete this ${formatTopicName(path)} check.`;
   const timedChallenge = !!(parentQuestionTimed && parentQuestionTimed.checked && count > 1);
 
-  return { subject, selectedLevel, path, count, testMode, childIds, prompt, timedChallenge, sendAll };
+  return { subject, selectedLevel, complexity, path, count, testMode, childIds, prompt, timedChallenge, sendAll };
 }
 
 function getParentQuestionDraftKey(config = getParentQuestionFormConfig()) {
@@ -2264,6 +2335,7 @@ function getParentQuestionDraftKey(config = getParentQuestionFormConfig()) {
     childIds: [...config.childIds].sort(),
     subject: config.subject,
     selectedLevel: config.selectedLevel,
+    complexity: config.complexity,
     path: config.path,
     count: config.count,
     timedChallenge: config.timedChallenge,
@@ -2274,6 +2346,8 @@ function getParentQuestionDraftKey(config = getParentQuestionFormConfig()) {
 function resetParentQuestionDraft() {
   parentQuestionDraft.key = "";
   parentQuestionDraft.questions = [];
+  parentQuestionDraft.reviewing = false;
+  parentQuestionDraft.refreshCount = 0;
   renderParentQuestionDraft();
 }
 
@@ -2282,21 +2356,83 @@ function syncParentQuestionDraft(config = getParentQuestionFormConfig()) {
 
   if (parentQuestionDraft.key && parentQuestionDraft.key !== nextKey) {
     parentQuestionDraft.questions = [];
+    parentQuestionDraft.reviewing = false;
+    parentQuestionDraft.refreshCount = 0;
   }
 
   parentQuestionDraft.key = nextKey;
+}
+
+function collectReviewedParentQuestionDraft(config = getParentQuestionFormConfig()) {
+  if (!parentQuestionDraft.questions.length) return [];
+
+  return parentQuestionDraft.questions.map((item, index) => {
+    const questionField = parentQuestionDraftPanel
+      ? parentQuestionDraftPanel.querySelector(`[name="reviewQuestionText${index}"]`)
+      : null;
+    const answerField = parentQuestionDraftPanel
+      ? parentQuestionDraftPanel.querySelector(`[name="reviewQuestionAnswer${index}"]`)
+      : null;
+    const explanationField = parentQuestionDraftPanel
+      ? parentQuestionDraftPanel.querySelector(`[name="reviewQuestionExplanation${index}"]`)
+      : null;
+
+    return {
+      ...item,
+      subject: config.subject,
+      prompt: config.prompt,
+      question: questionField ? questionField.value.trim() : item.question,
+      answer: answerField ? answerField.value.trim() : item.answer,
+      explanation: explanationField ? explanationField.value.trim() : item.explanation,
+      difficulty: config.complexity,
+      order: index + 1
+    };
+  });
+}
+
+function getParentQuestionTargetChildren(config, parent, isAcademy) {
+  return demoData.children.filter((child) => {
+    const canTarget = isAcademy || (parent && child.parentId === parent.id);
+    const matchesLevel = config.selectedLevel === "all" || getAgeGroup(child.age) === config.selectedLevel;
+    const matchesSelection = config.sendAll || config.childIds.includes(child.id);
+    return canTarget && matchesSelection && matchesLevel;
+  });
+}
+
+function generateAutoParentQuestionDraft(config, selectedChildren) {
+  const sharedAgeGroup = config.selectedLevel === "all"
+    ? getAgeGroup(selectedChildren[0].age)
+    : config.selectedLevel;
+
+  parentQuestionDraft.questions = buildParentTestQuestions({
+    subject: config.subject,
+    path: config.path,
+    ageGroup: sharedAgeGroup,
+    count: config.count,
+    prompt: config.prompt,
+    complexity: config.complexity,
+    refreshKey: parentQuestionDraft.refreshCount
+  });
+  parentQuestionDraft.reviewing = true;
+  renderParentQuestionDraft(config);
 }
 
 function renderParentQuestionDraft(config = getParentQuestionFormConfig()) {
   if (!parentQuestionDraftPanel || !parentQuestionSubmit) return;
 
   const isCustom = config.testMode === "custom";
-  parentQuestionDraftPanel.classList.toggle("hidden", !isCustom);
+  const isAutoReview = config.testMode === "auto" && parentQuestionDraft.reviewing;
+  parentQuestionDraftPanel.classList.toggle("hidden", !(isCustom || isAutoReview));
+  if (parentQuestionRefresh) {
+    parentQuestionRefresh.classList.toggle("hidden", !isAutoReview);
+  }
   parentQuestionSubmit.textContent = isCustom
     ? `${parentQuestionDraft.questions.length + 1 >= config.count ? "Add final question and send" : `Add question ${parentQuestionDraft.questions.length + 1} of ${config.count}`}`
-    : "Send selected test";
+    : isAutoReview
+      ? "Send reviewed test"
+      : "Review generated questions";
 
-  if (!isCustom) return;
+  if (!isCustom && !isAutoReview) return;
 
   const ready = parentQuestionDraft.questions.length;
   const remaining = Math.max(0, config.count - ready);
@@ -2308,9 +2444,37 @@ function renderParentQuestionDraft(config = getParentQuestionFormConfig()) {
   }
 
   if (parentQuestionDraftStatus) {
-    parentQuestionDraftStatus.textContent = remaining
+    parentQuestionDraftStatus.textContent = isAutoReview
+      ? `Complexity: ${getDifficultyLabel(config.complexity)}. Review and edit each question, answer, or explanation before sending.`
+      : remaining
       ? `Add ${remaining} more question${remaining === 1 ? "" : "s"}. Nothing is sent to the student until the full set is ready.`
       : "The full set is ready. The next click sends it to the selected student(s).";
+  }
+
+  const oldList = parentQuestionDraftPanel.querySelector(".question-review-list");
+  if (oldList) oldList.remove();
+
+  if (isAutoReview && ready) {
+    const reviewList = document.createElement("div");
+    reviewList.className = "question-review-list";
+    reviewList.innerHTML = parentQuestionDraft.questions.map((item, index) => `
+      <article class="question-review-row">
+        <strong>Question ${index + 1}</strong>
+        <label>
+          Question
+          <textarea name="reviewQuestionText${index}" rows="2">${escapeHtml(item.question || "")}</textarea>
+        </label>
+        <label>
+          Answer
+          <input name="reviewQuestionAnswer${index}" value="${escapeHtml(item.answer || "")}" />
+        </label>
+        <label>
+          Explanation
+          <textarea name="reviewQuestionExplanation${index}" rows="2">${escapeHtml(item.explanation || "")}</textarea>
+        </label>
+      </article>
+    `).join("");
+    parentQuestionDraftPanel.append(reviewList);
   }
 }
 
@@ -2330,7 +2494,8 @@ function preloadEditableParentQuestion(force = false) {
     path: config.path,
     ageGroup,
     count: Math.max(config.count, parentQuestionDraft.questions.length + 1),
-    prompt: config.prompt
+    prompt: config.prompt,
+    complexity: config.complexity
   });
   const question = previewQuestions[parentQuestionDraft.questions.length] || previewQuestions[0];
 
@@ -2386,10 +2551,11 @@ function renderParentQuestionStatus(child) {
   }
 
   if (latestAnswered) {
+    const duration = getParentQuestionAnswerDuration(latestAnswered);
     return `
       <div class="parent-question-note answered">
         <strong>Latest parent question answered</strong>
-        <span>${latestAnswered.correct ? "Correct" : "Needs review"} - Kid answer: ${escapeHtml(latestAnswered.childAnswer || "blank")} - Right answer: ${escapeHtml(latestAnswered.answer)}</span>
+        <span>${latestAnswered.correct ? "Correct" : "Needs review"} - Kid answer: ${escapeHtml(latestAnswered.childAnswer || "blank")} - Right answer: ${escapeHtml(latestAnswered.answer)} - Answered ${escapeHtml(formatClockTime(latestAnswered.answeredAt))}${duration ? ` in ${escapeHtml(duration)}` : ""}</span>
       </div>
     `;
   }
@@ -2461,11 +2627,17 @@ function renderAcademyStudentSearch(childrenWithStats) {
   `;
 
   return `
-    <section class="master-student-search" aria-label="Search student work">
+    <details class="master-student-search dashboard-dropdown" aria-label="Search student work">
+      <summary>
+        <span>
+          <small>Student work</small>
+          <strong>Check students</strong>
+        </span>
+      </summary>
       <label for="academyStudentSearch">Search student</label>
       <input id="academyStudentSearch" type="search" autocomplete="off" placeholder="Type a student name" value="${escapeHtml(dashboardState.academyStudentSearch)}" />
       <div class="master-student-list">${rows}</div>
-    </section>
+    </details>
   `;
 }
 
@@ -2593,10 +2765,11 @@ function renderPerformanceHistory(child, attempts) {
   `;
 }
 
-function renderWorkReview(childId, filter = "all", subject = "all", dateKey = "") {
+function renderWorkReview(childId, filter = "all", subject = "all", dateKey = "", shouldScroll = true) {
   const child = demoData.children.find((item) => item.id === childId);
 
   if (!child) {
+    dashboardState.activeReview = null;
     workReview.classList.add("hidden");
     return;
   }
@@ -2622,11 +2795,13 @@ function renderWorkReview(childId, filter = "all", subject = "all", dateKey = ""
     wrong: `${subjectLabel} wrong answers${dateLabel}`
   }[filter] || "All answers";
 
-  const rows = visibleAttempts.map((attempt) => `
+  const rows = visibleAttempts.map((attempt) => {
+    const answeredAt = attempt.answeredAt || attempt.createdAt;
+    return `
     <article class="work-row ${attempt.correct ? "is-correct" : "needs-review"}">
       <div>
         <strong>${escapeHtml(attempt.question)}</strong>
-        <span>${escapeHtml(formatHistoryDate(getAttemptDateKey(attempt.createdAt)))} - ${escapeHtml(attempt.subject)} - ${escapeHtml(attempt.skill || attempt.path || attempt.mode || "daily")} - ${escapeHtml(getDifficultyLabel(attempt.difficulty))}</span>
+        <span>${escapeHtml(formatHistoryDate(getAttemptDateKey(answeredAt)))} at ${escapeHtml(formatClockTime(answeredAt))} - ${escapeHtml(attempt.subject)} - ${escapeHtml(attempt.skill || attempt.path || attempt.mode || "daily")} - ${escapeHtml(getDifficultyLabel(attempt.difficulty))}</span>
       </div>
       <div>
         <small>Kid answer</small>
@@ -2638,7 +2813,8 @@ function renderWorkReview(childId, filter = "all", subject = "all", dateKey = ""
       </div>
       <em>${attempt.correct ? "Correct" : "Review"}</em>
     </article>
-  `).join("") || `
+  `;
+  }).join("") || `
     <article class="work-row">
       <div>
         <strong>No matching work yet</strong>
@@ -2658,7 +2834,21 @@ function renderWorkReview(childId, filter = "all", subject = "all", dateKey = ""
     </div>
     <div class="work-list">${rows}</div>
   `;
-  workReview.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (shouldScroll) {
+    workReview.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function restoreActiveWorkReview() {
+  if (!dashboardState.activeReview) return;
+
+  renderWorkReview(
+    dashboardState.activeReview.childId,
+    dashboardState.activeReview.filter,
+    dashboardState.activeReview.subject,
+    dashboardState.activeReview.dateKey,
+    false
+  );
 }
 
 const ageGroupLabel = document.querySelector("#ageGroupLabel");
@@ -2692,6 +2882,7 @@ const parentQuestionChild = document.querySelector("#parentQuestionChild");
 const parentQuestionSubject = document.querySelector("#parentQuestionSubject");
 const parentQuestionPath = document.querySelector("#parentQuestionPath");
 const parentQuestionLevel = document.querySelector("#parentQuestionLevel");
+const parentQuestionComplexity = document.querySelector("#parentQuestionComplexity");
 const parentQuestionCount = document.querySelector("#parentQuestionCount");
 const parentQuestionTimed = document.querySelector("#parentQuestionTimed");
 const parentQuestionSendAllWrap = document.querySelector("#parentQuestionSendAllWrap");
@@ -2706,6 +2897,7 @@ const parentQuestionDraftPanel = document.querySelector("#parentQuestionDraftPan
 const parentQuestionDraftTitle = document.querySelector("#parentQuestionDraftTitle");
 const parentQuestionDraftStatus = document.querySelector("#parentQuestionDraftStatus");
 const parentQuestionDraftClear = document.querySelector("#parentQuestionDraftClear");
+const parentQuestionRefresh = document.querySelector("#parentQuestionRefresh");
 const parentQuestionSubmit = document.querySelector("#parentQuestionSubmit");
 const timedChallengeBoard = document.querySelector("#timedChallengeBoard");
 const parentChildState = document.querySelector("#parentChildState");
@@ -2722,8 +2914,13 @@ const questionTitle = document.querySelector("#questionTitle");
 const questionPrompt = document.querySelector("#questionPrompt");
 const questionText = document.querySelector("#questionText");
 const levelChip = document.querySelector("#levelChip");
+const questionTimer = document.querySelector("#questionTimer");
+const studentTestAlert = document.querySelector("#studentTestAlert");
+const studentTestAlertTitle = document.querySelector("#studentTestAlertTitle");
+const studentTestAlertMeta = document.querySelector("#studentTestAlertMeta");
 const answerForm = document.querySelector("#answerForm");
 const answerInput = document.querySelector("#answerInput");
+const choiceGrid = document.querySelector("#choiceGrid");
 const feedback = document.querySelector("#feedback");
 const hintButton = document.querySelector("#hintButton");
 const nextButton = document.querySelector("#nextButton");
@@ -2778,6 +2975,68 @@ function isAnswerCorrect(submittedAnswer, correctAnswer) {
   }
 
   return normalize(submittedAnswer) === normalize(correctAnswer);
+}
+
+function uniqueChoiceValues(values) {
+  const seen = new Set();
+  return values
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .filter((value) => {
+      const key = normalize(value);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function formatChoiceNumber(value, isPercent = false) {
+  const rounded = Math.abs(value % 1) < 0.000001 ? String(Math.round(value)) : String(Math.round(value * 100) / 100);
+  return isPercent ? `${rounded}%` : rounded;
+}
+
+function buildGeneratedChoices(question) {
+  if (Array.isArray(question.choices) && question.choices.length) {
+    return uniqueChoiceValues(question.choices);
+  }
+
+  const answer = String(question.answer ?? "").trim();
+  if (!answer) return [];
+
+  const answerNumber = normalizeNumberLike(answer);
+  if (answerNumber) {
+    const base = answerNumber.value;
+    const step = Math.max(1, Math.round(Math.abs(base) * 0.1));
+    return uniqueChoiceValues([
+      formatChoiceNumber(base, answerNumber.isPercent),
+      formatChoiceNumber(base + step, answerNumber.isPercent),
+      formatChoiceNumber(base - step, answerNumber.isPercent),
+      formatChoiceNumber(base + step * 2, answerNumber.isPercent)
+    ]);
+  }
+
+  const lowerAnswer = normalize(answer);
+  if (["yes", "no"].includes(lowerAnswer)) {
+    return ["Yes", "No"];
+  }
+
+  const pools = {
+    math: ["8", "10", "12", "16", "25%", "50%", "1/2", "2/3", "x", "y"],
+    english: ["noun", "verb", "adjective", "adverb", "because", "however", "theme", "main idea"],
+    fun: ["USA", "Canada", "Japan", "Brazil", "Earth", "Mars", "Pacific", "Asia"]
+  };
+  const fallbackPool = pools[appState.subject] || [...pools.math, ...pools.english, ...pools.fun];
+
+  return uniqueChoiceValues([answer, ...fallbackPool]).slice(0, 4);
+}
+
+function getQuestionChoices(question) {
+  const choices = buildGeneratedChoices(question);
+  if (choices.length < 2) return [];
+
+  const seed = [question.text, question.answer, appState.subject, appState.path || appState.mode].join("|");
+  const shuffled = shuffleWithSeed(choices, seed);
+  return shuffled.slice(0, Math.min(4, shuffled.length));
 }
 
 function encodeParentQuestionPrompt(senderLabel, prompt) {
@@ -3760,17 +4019,48 @@ function createFunGeneratedQuestion(ageGroup, path, index) {
   return { skill: "Logic Puzzles", title: "Brain teaser", prompt, text, answer, hint: "Look for the pattern or rule." };
 }
 
+function clarifyGeneratedQuestion(question, subject) {
+  const prompt = String(question.prompt || "").trim();
+  const text = String(question.text || "").trim();
+  const actionPrompt = /\b(which|what|who|where|when|why|how|find|solve|evaluate|choose|pick|name|type|write|round|add|subtract|multiply|divide|convert|simplify|complete|answer|is)\b/i.test(prompt);
+  const placeholderContext = /^(logic|bloop|c|x|y)$/i.test(text);
+  const weakContext = placeholderContext || (text.length <= 2 && !actionPrompt);
+
+  if (weakContext && prompt.length > 12) {
+    const subjectInstruction = subject === "math"
+      ? "Solve the problem below."
+      : subject === "english"
+        ? "Read the question below and choose the best answer."
+        : "Read the question below and choose the best answer.";
+    return {
+      ...question,
+      prompt: subjectInstruction,
+      text: prompt,
+      hint: question.hint || "Use the information in the question to decide."
+    };
+  }
+
+  if (/^(solve|answer|evaluate)\.?$/i.test(prompt)) {
+    return {
+      ...question,
+      prompt: subject === "math" ? "Solve the problem shown." : "Answer the question shown."
+    };
+  }
+
+  return question;
+}
+
 function getGeneratedQuestions(subject, ageGroup, path, count = 24) {
   return Array.from({ length: count }, (_item, index) => {
     if (subject === "math") {
-      return createMathGeneratedQuestion(ageGroup, path, index);
+      return clarifyGeneratedQuestion(createMathGeneratedQuestion(ageGroup, path, index), subject);
     }
 
     if (subject === "fun") {
-      return createFunGeneratedQuestion(ageGroup, path, index);
+      return clarifyGeneratedQuestion(createFunGeneratedQuestion(ageGroup, path, index), subject);
     }
 
-    return createEnglishGeneratedQuestion(ageGroup, path, index);
+    return clarifyGeneratedQuestion(createEnglishGeneratedQuestion(ageGroup, path, index), subject);
   });
 }
 
@@ -3835,18 +4125,84 @@ function buildSizedQuestionSet(questions, count, seedText) {
   return result;
 }
 
-function buildParentTestQuestions({ subject, path, ageGroup, count, prompt }) {
-  const starterQuestions = getLevelPathQuestions(subject, path, ageGroup);
-  const generatedQuestions = getGeneratedQuestions(subject, ageGroup, path, Math.max(count * 2, 24));
-  const sourceQuestions = mergeUniqueQuestions([...starterQuestions, ...generatedQuestions]);
-  const seed = [getTodayKey(), subject, path, ageGroup, "parent-test"].join("|");
+function normalizeQuestionText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function isGenericQuestionPrompt(prompt) {
+  return /^(solve|solve the problem shown|answer|answer the question shown|evaluate|read the question below and choose the best answer)\.?$/i.test(prompt);
+}
+
+function makeGenericQuestionInstruction(prompt, text, subject) {
+  if (/evaluate/i.test(prompt)) {
+    return `Evaluate: ${text}`;
+  }
+
+  if (/solve/i.test(prompt)) {
+    return `Solve: ${text}`;
+  }
+
+  if (subject === "math") {
+    return `Solve the problem: ${text}`;
+  }
+
+  return `Answer the question: ${text}`;
+}
+
+function makeCompleteEditableQuestion(question, subject) {
+  const prompt = String(question.prompt || "").trim();
+  const text = String(question.text || "").trim();
+
+  if (!prompt) return text;
+  if (!text) return prompt;
+
+  const normalizedPrompt = normalizeQuestionText(prompt);
+  const normalizedText = normalizeQuestionText(text);
+
+  if (normalizedPrompt.includes(normalizedText) && normalizedText.length > 3) {
+    return prompt;
+  }
+
+  if (isGenericQuestionPrompt(prompt)) {
+    return makeGenericQuestionInstruction(prompt, text, subject);
+  }
+
+  if (/[?]$/.test(prompt)) {
+    return `${prompt.replace(/[?]+$/, "")}: ${text}?`;
+  }
+
+  return `${prompt.replace(/[.]+$/, "")}: ${text}`;
+}
+
+function ensureActionableEditableQuestion(text, subject) {
+  const value = String(text || "").trim();
+  const hasAction = /\b(which|what|who|where|when|why|how|find|solve|evaluate|choose|pick|name|type|write|round|add|subtract|multiply|divide|convert|simplify|complete|answer)\b/i.test(value);
+
+  if (hasAction || !value) return value;
+  return subject === "math"
+    ? `Solve the problem: ${value}`
+    : `Answer the question: ${value}`;
+}
+
+function buildParentTestQuestions({ subject, path, ageGroup, count, prompt, complexity = "medium", refreshKey = 0 }) {
+  const effectiveAgeGroup = getAdaptiveAgeGroup(ageGroup, complexity);
+  const starterQuestions = getLevelPathQuestions(subject, path, effectiveAgeGroup);
+  const adaptiveQuestions = complexity === "medium"
+    ? []
+    : adaptivePathQuestionBank[subject]?.[path]?.[complexity] || [];
+  const generatedQuestions = getGeneratedQuestions(subject, effectiveAgeGroup, path, Math.max(count * 2, 24));
+  const sourceQuestions = mergeUniqueQuestions([...adaptiveQuestions, ...starterQuestions, ...generatedQuestions]);
+  const seed = [getTodayKey(), subject, path, ageGroup, effectiveAgeGroup, complexity, "parent-test", refreshKey].join("|");
 
   return buildSizedQuestionSet(sourceQuestions, count, seed).map((question, index) => ({
     subject,
-    prompt: prompt || `${getSubjectLabel(subject)} ${getAgeGroupLabel(ageGroup)} skill check`,
-    question: question.text,
+    prompt: prompt || `${getSubjectLabel(subject)} ${getAgeGroupLabel(ageGroup)} ${getDifficultyLabel(complexity)} skill check`,
+    question: ensureActionableEditableQuestion(makeCompleteEditableQuestion(question, subject), subject),
     answer: question.answer,
     explanation: question.explanation || question.hint || "",
+    difficulty: complexity,
     order: index + 1
   }));
 }
@@ -4051,11 +4407,12 @@ function renderCompletedTestReport(report) {
   const accuracy = report.answered ? Math.round((report.correct / report.answered) * 100) : 0;
   const rows = report.questions.map((question, index) => {
     const why = question.explanation || "Review this question with your parent or teacher.";
+    const duration = getParentQuestionAnswerDuration(question);
     return `
       <article class="test-review-row ${question.correct ? "is-correct" : "needs-review"}">
         <div>
           <strong>${index + 1}. ${escapeHtml(question.question)}</strong>
-          <span>${question.correct ? "Right" : "Wrong"} - ${escapeHtml(why)}</span>
+          <span>${question.correct ? "Right" : "Wrong"} - Answered ${escapeHtml(formatClockTime(question.answeredAt))}${duration ? ` in ${escapeHtml(duration)}` : ""} - ${escapeHtml(why)}</span>
         </div>
         <div>
           <small>Your answer</small>
@@ -4077,11 +4434,48 @@ function renderCompletedTestReport(report) {
       <div class="test-review-list">${rows}</div>
     </section>
   `;
+  if (choiceGrid) {
+    choiceGrid.innerHTML = "";
+  }
   answerInput.value = "";
   answerForm.classList.add("hidden");
   nextButton.textContent = "Back to practice";
   feedback.className = accuracy >= 80 ? "feedback correct" : "feedback needs-work";
   feedback.textContent = `${report.correct} right and ${report.wrong} wrong.`;
+}
+
+function getPendingTestAlert(child) {
+  const nextQuestion = getNextPendingParentAssignment(child);
+  if (!nextQuestion) return null;
+
+  const group = nextQuestion.testGroupId
+    ? getChildParentQuestionGroups(child.id).find((item) => item.groupId === nextQuestion.testGroupId)
+    : null;
+  const total = group ? group.questions.length : 1;
+  const answered = group ? group.answered.length : 0;
+
+  return {
+    question: nextQuestion,
+    sender: getParentQuestionSenderLabel(nextQuestion),
+    total,
+    answered
+  };
+}
+
+function renderStudentTestAlert() {
+  if (!studentTestAlert) return;
+
+  const child = getCurrentChild();
+  const alert = child ? getPendingTestAlert(child) : null;
+  const isActiveTest = appState.mode === "parent-check";
+
+  studentTestAlert.classList.toggle("hidden", !alert || isActiveTest);
+  if (!alert || isActiveTest) return;
+
+  studentTestAlertTitle.textContent = `Test from ${alert.sender}`;
+  studentTestAlertMeta.textContent = alert.total > 1
+    ? `${alert.total - alert.answered} of ${alert.total} questions waiting`
+    : "1 question waiting";
 }
 
 function renderTopicSelect() {
@@ -4099,12 +4493,12 @@ function renderTopicSelect() {
 
   const groupOptions = pendingGroups.map((group) => `
     <option value="testgroup:${escapeHtml(group.groupId)}" ${appState.parentTestGroupId === group.groupId ? "selected" : ""}>
-      ${escapeHtml(`Test (${getParentQuestionSenderLabel(group.questions[0])}): ${group.answered.length}/${group.questions.length} done`)}
+      ${escapeHtml(`NEW TEST (${getParentQuestionSenderLabel(group.questions[0])}): ${group.questions.length - group.answered.length} waiting`)}
     </option>
   `).join("");
   const singleOptions = pendingTests.map((question, index) => `
     <option value="test:${escapeHtml(question.id)}" ${appState.parentQuestionId === question.id ? "selected" : ""}>
-      ${escapeHtml(`Test (${getParentQuestionSenderLabel(question)}) ${index + 1}: ${question.question}`)}
+      ${escapeHtml(`NEW TEST (${getParentQuestionSenderLabel(question)}) ${index + 1}: ${question.question}`)}
     </option>
   `).join("");
   const testOptions = pendingGroups.length || pendingTests.length
@@ -4115,16 +4509,50 @@ function renderTopicSelect() {
       </optgroup>
     `
     : "";
+  const placementOption = appState.subject === "math" || appState.subject === "english"
+    ? `<option value="placement" ${appState.mode === "placement" ? "selected" : ""}>Placement check</option>`
+    : "";
 
   topicSelect.innerHTML = [
     testOptions,
     `<optgroup label="Practice">
-      <option value="" ${!appState.path && appState.mode !== "parent-check" ? "selected" : ""}>Recommended practice</option>
+      <option value="" ${!appState.path && appState.mode !== "parent-check" && appState.mode !== "placement" ? "selected" : ""}>Recommended practice</option>
+      ${placementOption}
       ${subjectSkills.map((skill) => `
-        <option value="${escapeHtml(skill.key)}" ${appState.path === skill.key && appState.mode !== "parent-check" ? "selected" : ""}>${escapeHtml(skill.title)}</option>
+        <option value="${escapeHtml(skill.key)}" ${appState.path === skill.key && appState.mode !== "parent-check" && appState.mode !== "placement" ? "selected" : ""}>${escapeHtml(skill.title)}</option>
       `).join("")}
     </optgroup>`
   ].join("");
+}
+
+async function openPendingParentQuestion(parentQuestion) {
+  const child = getCurrentChild();
+  if (!child || !parentQuestion || parentQuestion.status !== "pending") return;
+
+  if (parentQuestion.testGroupId) {
+    try {
+      await markParentQuestionGroupStarted(parentQuestion.testGroupId, child);
+    } catch (error) {
+      feedback.className = "feedback needs-work";
+      feedback.textContent = `Timer started here, but the database did not save the start time yet: ${getDatabaseErrorMessage(error)}`;
+    }
+  }
+
+  appState.path = null;
+  appState.mode = "parent-check";
+  appState.parentQuestionId = parentQuestion.id;
+  appState.parentTestGroupId = parentQuestion.testGroupId || null;
+  appState.subject = parentQuestion.subject;
+  appState.index = 0;
+  appState.correct = 0;
+  appState.answered = 0;
+  appState.practiceRound = 0;
+  appState.startedAt = Date.now();
+  appState.parentQuestionJustCompleted = false;
+  appState.completedTestReport = null;
+  render();
+  document.querySelector("#practice").scrollIntoView({ behavior: "smooth", block: "start" });
+  answerInput.focus();
 }
 
 function syncLearnerMode() {
@@ -4155,15 +4583,7 @@ function syncLearnerMode() {
     appState.parentTestGroupId = null;
   }
 
-  const subjectUsesPlacement = appState.subject === "math" || appState.subject === "english";
-  const needsPlacement = subjectUsesPlacement && child && !hasPlacementResult(child, appState.subject);
-
-  if (needsPlacement && !appState.path && appState.answered === 0) {
-    appState.mode = "placement";
-    return;
-  }
-
-  if (appState.mode === "placement" && (!needsPlacement || appState.path)) {
+  if (appState.mode === "placement" && appState.path) {
     appState.mode = "practice";
   }
 }
@@ -4241,6 +4661,7 @@ function renderParentDashboard() {
 
   if (!allChildren.length) {
     rankingGrid.innerHTML = "";
+    dashboardState.activeReview = null;
     parentReport.innerHTML = `
       <article class="report-card">
         <h3>No child profiles yet</h3>
@@ -4254,7 +4675,8 @@ function renderParentDashboard() {
     const attempts = getChildAttempts(child.id);
     const correct = attempts.filter((attempt) => attempt.correct).length;
     const accuracy = attempts.length ? Math.round((correct / attempts.length) * 100) : 0;
-    return { child, attempts, correct, accuracy, ageGroup: getAgeGroup(child.age) };
+    const completedTime = getLatestCompletedTestTime(child.id);
+    return { child, attempts, correct, accuracy, completedTime, ageGroup: getAgeGroup(child.age) };
   });
 
   const ageGroups = ["early", "elementary", "middle", "teen"];
@@ -4262,7 +4684,7 @@ function renderParentDashboard() {
   rankingGrid.innerHTML = ageGroups.map((ageGroup) => {
     const rankedChildren = childrenWithStats
       .filter((item) => item.ageGroup === ageGroup)
-      .sort((a, b) => b.accuracy - a.accuracy || b.correct - a.correct || b.attempts.length - a.attempts.length || a.child.name.localeCompare(b.child.name));
+      .sort((a, b) => b.accuracy - a.accuracy || b.correct - a.correct || a.completedTime.value - b.completedTime.value || b.attempts.length - a.attempts.length || a.child.name.localeCompare(b.child.name));
 
     const rows = rankedChildren.map((item, index) => `
       <li>
@@ -4271,7 +4693,10 @@ function renderParentDashboard() {
           <strong>${escapeHtml(item.child.name)}</strong>
           <small>${item.attempts.length} answers</small>
         </span>
-        <b>${item.accuracy}%</b>
+        <span class="rank-result">
+          <b>${item.accuracy}%</b>
+          <small>${escapeHtml(item.completedTime.label)}</small>
+        </span>
       </li>
     `).join("") || "<li class=\"empty-rank\">No kids in this group yet.</li>";
 
@@ -4285,6 +4710,7 @@ function renderParentDashboard() {
 
   if (isAcademy) {
     parentReport.innerHTML = renderAcademyStudentSearch(childrenWithStats);
+    restoreActiveWorkReview();
     return;
   }
 
@@ -4316,6 +4742,7 @@ function renderParentDashboard() {
       </article>
     `;
   }).join("");
+  restoreActiveWorkReview();
 }
 
 function showSessionView() {
@@ -4358,11 +4785,15 @@ function render() {
 
   if (appState.mode === "test-complete" && appState.completedTestReport) {
     renderTopicSelect();
+    renderStudentTestAlert();
+    document.querySelector(".activity-card")?.classList.remove("active-parent-test");
     renderCompletedTestReport(appState.completedTestReport);
     return;
   }
 
   syncLearnerMode();
+  renderStudentTestAlert();
+  document.querySelector(".activity-card")?.classList.toggle("active-parent-test", appState.mode === "parent-check");
   const track = getCurrentTrack();
   const question = getCurrentQuestion();
   const roundSize = track.questions.length || 1;
@@ -4376,6 +4807,16 @@ function render() {
   questionPrompt.textContent = question.prompt;
   questionText.textContent = question.text;
   answerForm.classList.remove("hidden");
+  const choices = getQuestionChoices(question);
+  if (choiceGrid) {
+    choiceGrid.innerHTML = choices.map((choice, index) => `
+      <button type="button" data-choice-answer="${escapeHtml(choice)}">
+        <span>${String.fromCharCode(65 + index)}</span>
+        ${escapeHtml(choice)}
+      </button>
+    `).join("");
+    choiceGrid.classList.toggle("hidden", !choices.length);
+  }
   answerInput.disabled = false;
   const answerSubmitButton = answerForm.querySelector("button[type='submit']");
   if (answerSubmitButton) {
@@ -4388,6 +4829,7 @@ function render() {
   const difficultyText = appState.mode === "practice" ? `, ${getDifficultyLabel(question.difficulty)}` : "";
   feedback.textContent = `Today set: question ${(appState.index % roundSize) + 1} of ${roundSize}. Score ${appState.correct}/${appState.answered}${timerText}${difficultyText}.`;
   feedback.className = "feedback";
+  updateQuestionTimer();
 
   renderTopicSelect();
 }
@@ -4597,6 +5039,15 @@ parentQuestionForm.addEventListener("submit", async (event) => {
   let customQuestionSet = [];
 
   try {
+    const selectedChildren = getParentQuestionTargetChildren(config, parent, isAcademy);
+
+    if (!selectedChildren.length) {
+      authMessage.textContent = sendAll
+        ? "No students match this level yet."
+        : "Choose at least one student, or use Send to all students from the master account.";
+      return;
+    }
+
     if (testMode === "custom") {
       syncParentQuestionDraft(config);
 
@@ -4633,31 +5084,32 @@ parentQuestionForm.addEventListener("submit", async (event) => {
       customQuestionSet = [...parentQuestionDraft.questions];
     }
 
-    const selectedChildren = demoData.children.filter((child) => {
-      const canTarget = isAcademy || (parent && child.parentId === parent.id);
-      const matchesLevel = selectedLevel === "all" || getAgeGroup(child.age) === selectedLevel;
-      const matchesSelection = sendAll || childIds.includes(child.id);
-      return canTarget && matchesSelection && matchesLevel;
-    });
-
-    if (!selectedChildren.length) {
-      authMessage.textContent = sendAll
-        ? "No students match this level yet."
-        : "Choose at least one student, or use Send to all students from the master account.";
-      return;
-    }
-
     let sentCount = 0;
     const sharedTestGroupId = count > 1
       ? `${timedChallenge ? "challenge" : "test"}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
       : "";
     const senderLabel = isAcademy ? "Master" : parent.name;
+    if (testMode === "auto" && !parentQuestionDraft.reviewing) {
+      syncParentQuestionDraft(config);
+      generateAutoParentQuestionDraft(config, selectedChildren);
+      renderParentQuestionDraft(config);
+      parentQuestionDraftPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      authMessage.textContent = `Review ${parentQuestionDraft.questions.length} generated question${parentQuestionDraft.questions.length === 1 ? "" : "s"}, edit anything needed, then send.`;
+      return;
+    }
+
+    const sharedQuestions = testMode === "custom"
+      ? customQuestionSet
+      : collectReviewedParentQuestionDraft(config);
+
+    const missingQuestion = sharedQuestions.find((item) => !item.question || !item.answer);
+    if (missingQuestion) {
+      authMessage.textContent = "Every reviewed question needs both a question and a correct answer before sending.";
+      return;
+    }
 
     for (const child of selectedChildren) {
-      const ageGroup = selectedLevel === "all" ? getAgeGroup(child.age) : selectedLevel;
-      const questions = testMode === "custom"
-        ? customQuestionSet
-        : buildParentTestQuestions({ subject, path, ageGroup, count, prompt });
+      const questions = sharedQuestions;
 
       for (const item of questions) {
         await createParentQuestion({
@@ -4713,6 +5165,11 @@ parentQuestionLevel.addEventListener("change", () => {
   preloadEditableParentQuestion();
 });
 
+parentQuestionComplexity.addEventListener("change", () => {
+  resetParentQuestionDraft();
+  preloadEditableParentQuestion(true);
+});
+
 parentQuestionPath.addEventListener("change", () => {
   resetParentQuestionDraft();
   preloadEditableParentQuestion();
@@ -4754,6 +5211,33 @@ parentQuestionDraftClear.addEventListener("click", () => {
   authMessage.textContent = "Question draft cleared.";
 });
 
+if (parentQuestionRefresh) {
+  parentQuestionRefresh.addEventListener("click", () => {
+    const parent = getCurrentParent();
+    const isAcademy = session && session.role === "academy";
+    const config = getParentQuestionFormConfig();
+    const selectedChildren = getParentQuestionTargetChildren(config, parent, isAcademy);
+
+    if (config.testMode !== "auto") {
+      authMessage.textContent = "Refresh is available for auto-generated tests.";
+      return;
+    }
+
+    if (!selectedChildren.length) {
+      authMessage.textContent = config.sendAll
+        ? "No students match this level yet."
+        : "Choose at least one student before refreshing questions.";
+      return;
+    }
+
+    syncParentQuestionDraft(config);
+    parentQuestionDraft.refreshCount += 1;
+    generateAutoParentQuestionDraft(config, selectedChildren);
+    parentQuestionDraftPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    authMessage.textContent = `New question set loaded. Review ${parentQuestionDraft.questions.length} question${parentQuestionDraft.questions.length === 1 ? "" : "s"} before sending.`;
+  });
+}
+
 academyManagement.addEventListener("click", async (event) => {
   const parentButton = event.target.closest("[data-delete-parent]");
   const childButton = event.target.closest("[data-delete-child]");
@@ -4791,16 +5275,23 @@ parentDashboard.addEventListener("click", (event) => {
   const closeButton = event.target.closest("[data-close-review]");
 
   if (reviewButton) {
+    dashboardState.activeReview = {
+      childId: reviewButton.dataset.reviewChild,
+      filter: reviewButton.dataset.reviewFilter || "all",
+      subject: reviewButton.dataset.reviewSubject || "all",
+      dateKey: reviewButton.dataset.reviewDate || ""
+    };
     renderWorkReview(
-      reviewButton.dataset.reviewChild,
-      reviewButton.dataset.reviewFilter,
-      reviewButton.dataset.reviewSubject || "all",
-      reviewButton.dataset.reviewDate || ""
+      dashboardState.activeReview.childId,
+      dashboardState.activeReview.filter,
+      dashboardState.activeReview.subject,
+      dashboardState.activeReview.dateKey
     );
     return;
   }
 
   if (closeButton) {
+    dashboardState.activeReview = null;
     workReview.classList.add("hidden");
   }
 });
@@ -4847,23 +5338,16 @@ topicSelect.addEventListener("change", async () => {
   const selectedTest = selectedTestId ? getParentQuestionById(selectedTestId) : null;
 
   if (selectedGroupQuestion) {
-    try {
-      await markParentQuestionGroupStarted(selectedGroupId, child);
-    } catch (error) {
-      feedback.className = "feedback needs-work";
-      feedback.textContent = `Timer started here, but the database did not save the start time yet: ${getDatabaseErrorMessage(error)}`;
-    }
-    appState.path = null;
-    appState.mode = "parent-check";
-    appState.parentQuestionId = selectedGroupQuestion.id;
-    appState.parentTestGroupId = selectedGroupId;
-    appState.subject = selectedGroupQuestion.subject;
+    await openPendingParentQuestion(selectedGroupQuestion);
+    return;
   } else if (selectedTest && selectedTest.status === "pending") {
+    await openPendingParentQuestion(selectedTest);
+    return;
+  } else if (selectedValue === "placement") {
     appState.path = null;
-    appState.mode = "parent-check";
-    appState.parentQuestionId = selectedTest.id;
+    appState.mode = "placement";
+    appState.parentQuestionId = null;
     appState.parentTestGroupId = null;
-    appState.subject = selectedTest.subject;
   } else {
     appState.path = selectedValue || null;
     appState.mode = "practice";
@@ -4882,6 +5366,15 @@ topicSelect.addEventListener("change", async () => {
   document.querySelector("#practice").scrollIntoView({ behavior: "smooth", block: "start" });
   answerInput.focus();
 });
+
+if (studentTestAlert) {
+  studentTestAlert.addEventListener("click", async () => {
+    const child = getCurrentChild();
+    const alert = child ? getPendingTestAlert(child) : null;
+    if (!alert) return;
+    await openPendingParentQuestion(alert.question);
+  });
+}
 
 subjectButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -4905,6 +5398,19 @@ subjectButtons.forEach((button) => {
 shareButtons.forEach((button) => {
   button.addEventListener("click", shareAppLink);
 });
+
+if (choiceGrid) {
+  choiceGrid.addEventListener("click", (event) => {
+    const choiceButton = event.target.closest("[data-choice-answer]");
+    if (!choiceButton || answerInput.disabled) return;
+
+    answerInput.value = choiceButton.dataset.choiceAnswer || "";
+    choiceGrid.querySelectorAll("[data-choice-answer]").forEach((button) => {
+      button.classList.toggle("selected", button === choiceButton);
+    });
+    answerForm.requestSubmit();
+  });
+}
 
 answerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -4930,7 +5436,9 @@ answerForm.addEventListener("submit", async (event) => {
     const nextAnswered = appState.answered;
     const roundSize = getCurrentRoundSize();
     const isPlacementComplete = appState.mode === "placement" && nextAnswered >= roundSize;
+    const isParentQuestion = Boolean(question.parentQuestionId);
 
+    const answeredAt = Date.now();
     const attempt = {
       childId: child.id,
       subject: appState.subject,
@@ -4943,12 +5451,13 @@ answerForm.addEventListener("submit", async (event) => {
       correctAnswer: question.answer,
       explanation: question.explanation || question.hint || "",
       correct: isCorrect,
-      createdAt: Date.now()
+      createdAt: answeredAt,
+      answeredAt
     };
 
     demoData.attempts.push(attempt);
 
-    if (question.parentQuestionId) {
+    if (isParentQuestion) {
       answerInput.disabled = true;
       const answerSubmitButton = answerForm.querySelector("button[type='submit']");
       if (answerSubmitButton) {
@@ -5018,6 +5527,21 @@ answerForm.addEventListener("submit", async (event) => {
 
     renderProfile();
   }
+
+  const shouldAutoAdvance = isCorrect
+    && !question.parentQuestionId
+    && !(appState.mode === "placement" && appState.answered >= getCurrentRoundSize());
+
+  if (shouldAutoAdvance) {
+    answerInput.disabled = true;
+    const answerSubmitButton = answerForm.querySelector("button[type='submit']");
+    if (answerSubmitButton) {
+      answerSubmitButton.disabled = true;
+    }
+    window.setTimeout(() => {
+      advancePracticeQuestion();
+    }, 650);
+  }
 });
 
 hintButton.addEventListener("click", () => {
@@ -5026,7 +5550,7 @@ hintButton.addEventListener("click", () => {
   answerInput.focus();
 });
 
-nextButton.addEventListener("click", () => {
+function advancePracticeQuestion() {
   if (appState.mode === "test-complete") {
     appState.mode = "practice";
     appState.completedTestReport = null;
@@ -5068,6 +5592,10 @@ nextButton.addEventListener("click", () => {
   appState.index = (appState.index + 1) % roundSize;
   render();
   answerInput.focus();
+}
+
+nextButton.addEventListener("click", () => {
+  advancePracticeQuestion();
 });
 
 async function startApp() {
@@ -5106,3 +5634,7 @@ startApp();
 setInterval(() => {
   refreshCurrentKidPortal({ rerender: true });
 }, 15000);
+
+setInterval(() => {
+  updateQuestionTimer();
+}, 1000);
