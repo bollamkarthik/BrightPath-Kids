@@ -9,5 +9,16 @@
       "destination": "/prototype/",
       "permanent": false
     }
+  ],
+  "headers": [
+    {
+      "source": "/prototype/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    }
   ]
 }
