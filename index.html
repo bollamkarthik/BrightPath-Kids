@@ -160,6 +160,7 @@
               </div>
               <button type="submit">Create child profile</button>
             </form>
+            <div class="parent-child-list" id="parentChildList"></div>
           </section>
 
           <section class="parent-question-manager hidden" id="parentQuestionManager" aria-label="Send a question">
@@ -305,7 +306,7 @@
               </form>
             </div>
 
-            <details class="dashboard-dropdown">
+            <details class="dashboard-dropdown" open>
               <summary>
                 <span>
                   <small>Roster cleanup</small>
@@ -314,11 +315,11 @@
                 </span>
               </summary>
               <div class="roster-grid">
-                <details class="nested-dashboard-dropdown">
+                <details class="nested-dashboard-dropdown" open>
                   <summary>Parents</summary>
                   <div class="roster-list" id="parentRoster"></div>
                 </details>
-                <details class="nested-dashboard-dropdown">
+                <details class="nested-dashboard-dropdown" open>
                   <summary>Students</summary>
                   <div class="roster-list" id="childRoster"></div>
                 </details>

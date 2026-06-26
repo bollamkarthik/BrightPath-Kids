@@ -536,6 +536,55 @@ h2 {
   box-shadow: 0 10px 28px rgba(39, 40, 76, .07);
 }
 
+.parent-child-list {
+  display: grid;
+  gap: 8px;
+}
+
+.parent-child-list > strong {
+  color: var(--ink);
+}
+
+.parent-child-list-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.parent-child-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  background: #fff7f7;
+  border: 1px solid #ffd4d4;
+  border-radius: 8px;
+}
+
+.parent-child-list-row b,
+.parent-child-list-row small {
+  display: block;
+}
+
+.parent-child-list-row small {
+  color: var(--muted);
+}
+
+.parent-child-list-row button {
+  min-height: 36px;
+  padding: 8px 10px;
+  color: #fff;
+  background: #c44343;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.parent-child-list-row button:disabled {
+  opacity: .72;
+  cursor: wait;
+}
+
 .management-grid,
 .roster-grid {
   display: grid;

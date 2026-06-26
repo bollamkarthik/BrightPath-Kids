@@ -1777,8 +1777,7 @@ function removeDefaultProfiles() {
     return !defaultChildIds.has(child.id)
       && !defaultParentIds.has(child.parentId)
       && !defaultChildCodes.has(String(child.code || "").toUpperCase())
-      && childName !== "avery stone"
-      && childName !== "maya patel";
+      && childName !== "avery stone";
   });
   demoData.attempts = (demoData.attempts || []).filter((attempt) => !defaultChildIds.has(attempt.childId));
   demoData.parentQuestions = (demoData.parentQuestions || []).filter((question) => !defaultChildIds.has(question.childId));
@@ -2122,9 +2121,29 @@ function renderParentChildManager(parent) {
   if (!parent || !parentChildManager) return;
 
   const childCount = getParentChildCount(parent.id);
+  const children = demoData.children.filter((child) => child.parentId === parent.id);
   const submitButton = parentChildForm.querySelector("button[type='submit']");
   parentChildLimitNote.textContent = `${childCount} child profile${childCount === 1 ? "" : "s"} added`;
   parentChildForm.classList.remove("hidden");
+
+  if (parentChildList) {
+    parentChildList.innerHTML = children.length
+      ? `
+        <strong>Your child profiles</strong>
+        <div class="parent-child-list-grid">
+          ${children.map((child) => `
+            <article class="parent-child-list-row">
+              <span>
+                <b>${escapeHtml(child.name)}</b>
+                <small>${escapeHtml(child.code)} - ${escapeHtml(getChildLevelLabel(child))}</small>
+              </span>
+              <button type="button" data-parent-delete-child="${escapeHtml(child.id)}">Delete child</button>
+            </article>
+          `).join("")}
+        </div>
+      `
+      : "<p class=\"helper-text\">No child profiles yet.</p>";
+  }
 
   if (submitButton) {
     submitButton.disabled = false;
@@ -2900,6 +2919,7 @@ const academyManagement = document.querySelector("#academyManagement");
 const workReview = document.querySelector("#workReview");
 const parentChildManager = document.querySelector("#parentChildManager");
 const parentChildForm = document.querySelector("#parentChildForm");
+const parentChildList = document.querySelector("#parentChildList");
 const parentQuestionManager = document.querySelector("#parentQuestionManager");
 const parentQuestionForm = document.querySelector("#parentQuestionForm");
 const parentQuestionChild = document.querySelector("#parentQuestionChild");
@@ -4757,7 +4777,7 @@ function renderParentDashboard() {
           </div>
           <div class="report-card-actions">
             <span class="code-pill">${escapeHtml(child.code)}</span>
-            <button type="button" data-parent-delete-child="${escapeHtml(child.id)}">Delete child</button>
+            <button type="button" data-parent-delete-child="${escapeHtml(child.id)}">Delete profile</button>
           </div>
         </header>
         ${renderParentQuestionStatus(child)}
@@ -5339,7 +5359,7 @@ parentDashboard.addEventListener("click", (event) => {
       })
       .catch((error) => {
         deleteChildButton.disabled = false;
-        deleteChildButton.textContent = "Delete child";
+        deleteChildButton.textContent = deleteChildButton.closest(".parent-child-list-row") ? "Delete child" : "Delete profile";
         authMessage.textContent = `Could not delete ${child.name}: ${getDatabaseErrorMessage(error)}`;
       });
     return;
