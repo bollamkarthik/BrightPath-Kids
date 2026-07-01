@@ -817,6 +817,43 @@ begin
 end;
 $$;
 
+create or replace function public.delete_own_student(
+  target_student_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  selected_student public.students%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception 'Login required.';
+  end if;
+
+  select students.* into selected_student
+  from public.students
+  join public.parents on parents.id = students.parent_id
+  where students.id = target_student_id
+    and (parents.id = auth.uid() or parents.auth_user_id = auth.uid())
+  limit 1;
+
+  if not found then
+    raise exception 'This child profile is not under your parent account.';
+  end if;
+
+  delete from public.parent_questions
+  where child_id = target_student_id;
+
+  delete from public.attempts
+  where child_id = target_student_id;
+
+  delete from public.students
+  where id = target_student_id;
+end;
+$$;
+
 create or replace function public.academy_delete_parent(
   target_parent_id uuid
 )
@@ -856,6 +893,7 @@ grant execute on function public.academy_create_parent(text, text) to anon, auth
 grant execute on function public.academy_create_student(uuid, text, text, integer, text, text) to anon, authenticated;
 grant execute on function public.academy_update_parent_child_limit(uuid, integer) to anon, authenticated;
 grant execute on function public.academy_delete_student(uuid) to anon, authenticated;
+grant execute on function public.delete_own_student(uuid) to anon, authenticated;
 grant execute on function public.academy_delete_parent(uuid) to anon, authenticated;
 
 create or replace view public.student_work_summary as
