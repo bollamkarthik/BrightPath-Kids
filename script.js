@@ -1273,11 +1273,20 @@ async function refreshCurrentKidPortal({ rerender = false } = {}) {
 
   kidRefreshInFlight = true;
   try {
-    await signInChildWithCode({
+    const refreshed = await signInChildWithCode({
       firstName: child.firstName,
       lastName: child.lastName,
       code: session.childCode
     });
+    if (refreshed && refreshed.child) {
+      session = {
+        ...session,
+        parentId: refreshed.child.parentId,
+        childId: refreshed.child.id,
+        childSnapshot: refreshed.child
+      };
+      saveSession();
+    }
 
     if (rerender && appState.answered === 0) {
       syncLearnerMode();
@@ -1648,6 +1657,11 @@ async function deleteChildProfile(childId) {
       target_student_id: childId
     });
     if (error) throw error;
+  } else if (hasDatabaseConnection() && isDatabaseUuid(childId) && session && session.role === "parent") {
+    const { error } = await supabaseClient.rpc("delete_own_student", {
+      target_student_id: childId
+    });
+    if (error) throw error;
   } else if (hasDatabaseConnection() && isDatabaseUuid(childId)) {
     await supabaseClient.from("parent_questions").delete().eq("child_id", childId);
     await supabaseClient.from("attempts").delete().eq("child_id", childId);
@@ -1859,7 +1873,12 @@ function getCurrentParent() {
 
 function getCurrentChild() {
   if (!session) return null;
-  return demoData.children.find((child) => child.id === session.childId) || null;
+  const child = demoData.children.find((child) => child.id === session.childId);
+  if (child) return child;
+  if (session.role === "kid" && session.childSnapshot && session.childSnapshot.id === session.childId) {
+    return session.childSnapshot;
+  }
+  return null;
 }
 
 function normalizeNamePart(value) {
@@ -2971,8 +2990,41 @@ const nextButton = document.querySelector("#nextButton");
 const shareButtons = document.querySelectorAll("[data-share-app]");
 const celebrationLayer = document.querySelector("#celebrationLayer");
 
+function getShareableAppUrl() {
+  if (window.location.protocol === "file:") {
+    return "https://bright-path-kids.vercel.app/prototype/";
+  }
+
+  const path = window.location.pathname.includes("/prototype/")
+    ? "/prototype/"
+    : "/";
+  return new URL(path, window.location.origin).toString();
+}
+
+function copyTextFallback(text) {
+  const input = document.createElement("input");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  input.style.pointerEvents = "none";
+  document.body.appendChild(input);
+  input.select();
+  input.setSelectionRange(0, input.value.length);
+
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+
+  input.remove();
+  return copied;
+}
+
 async function shareAppLink() {
-  const appUrl = `${window.location.origin}/`;
+  const appUrl = getShareableAppUrl();
   const shareData = {
     title: "BrightPath Kids",
     text: "Join BrightPath Kids for English and math practice.",
@@ -2985,10 +3037,19 @@ async function shareAppLink() {
       return;
     }
 
-    await navigator.clipboard.writeText(appUrl);
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(appUrl);
+    } else if (!copyTextFallback(appUrl)) {
+      throw new Error("Copy was blocked.");
+    }
+
     authMessage.textContent = "App link copied. Paste it into text, WhatsApp, or email.";
   } catch {
-    authMessage.textContent = appUrl;
+    if (copyTextFallback(appUrl)) {
+      authMessage.textContent = "App link copied. Paste it into text, WhatsApp, or email.";
+    } else {
+      authMessage.textContent = `Copy this app link: ${appUrl}`;
+    }
   }
 }
 
@@ -4924,7 +4985,7 @@ kidLoginForm.addEventListener("submit", async (event) => {
   try {
     const { child, code: childCode } = await signInChildWithCode({ firstName, lastName, code });
 
-    session = { role: "kid", parentId: child.parentId, childId: child.id, childCode };
+    session = { role: "kid", parentId: child.parentId, childId: child.id, childCode, childSnapshot: child };
     appState.age = getAgeGroup(child.age);
     appState.path = null;
     appState.index = 0;
@@ -5332,7 +5393,7 @@ academyManagement.addEventListener("click", async (event) => {
   }
 });
 
-parentDashboard.addEventListener("click", (event) => {
+parentDashboard.addEventListener("click", async (event) => {
   const deleteChildButton = event.target.closest("[data-parent-delete-child]");
   const reviewButton = event.target.closest("[data-review-child]");
   const closeButton = event.target.closest("[data-close-review]");
@@ -5340,7 +5401,12 @@ parentDashboard.addEventListener("click", (event) => {
   if (deleteChildButton) {
     const childId = deleteChildButton.dataset.parentDeleteChild;
     const parent = getCurrentParent();
-    const child = demoData.children.find((item) => item.id === childId && parent && item.parentId === parent.id);
+    let child = demoData.children.find((item) => item.id === childId && parent && item.parentId === parent.id);
+
+    if (!child && parent) {
+      await refreshDashboardData({ silent: true });
+      child = demoData.children.find((item) => item.id === childId && item.parentId === parent.id);
+    }
 
     if (!child) {
       authMessage.textContent = "That child profile was not found under this parent.";
@@ -5351,17 +5417,16 @@ parentDashboard.addEventListener("click", (event) => {
     deleteChildButton.textContent = "Deleting...";
     authMessage.textContent = `Deleting ${child.name} and work history...`;
 
-    deleteChildProfile(childId)
-      .then(() => refreshDashboardData({ silent: true }))
-      .then(() => {
-        authMessage.textContent = `${child.name} was deleted.`;
-        renderParentDashboard();
-      })
-      .catch((error) => {
-        deleteChildButton.disabled = false;
-        deleteChildButton.textContent = deleteChildButton.closest(".parent-child-list-row") ? "Delete child" : "Delete profile";
-        authMessage.textContent = `Could not delete ${child.name}: ${getDatabaseErrorMessage(error)}`;
-      });
+    try {
+      await deleteChildProfile(childId);
+      await refreshDashboardData({ silent: true });
+      authMessage.textContent = `${child.name} was deleted.`;
+      renderParentDashboard();
+    } catch (error) {
+      deleteChildButton.disabled = false;
+      deleteChildButton.textContent = deleteChildButton.closest(".parent-child-list-row") ? "Delete child" : "Delete profile";
+      authMessage.textContent = `Could not delete ${child.name}: ${getDatabaseErrorMessage(error)}`;
+    }
     return;
   }
 
