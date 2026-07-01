@@ -4,13 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BrightPath Kids</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260630-kid-session" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
     <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" />
     <meta name="theme-color" content="#5b6cff" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./config.js"></script>
+    <script src="./config.js?v=20260630-kid-session"></script>
   </head>
   <body>
     <section class="auth-screen" id="authScreen">
@@ -147,7 +147,7 @@
               </div>
               <div>
                 <label class="required-label" for="parentChildLastName">Last name</label>
-                <input id="parentChildLastName" name="parentChildLastName" autocomplete="family-name" placeholder="Example: Patel" required />
+                <input id="parentChildLastName" name="parentChildLastName" autocomplete="family-name" placeholder="Example: Rivera" required />
               </div>
               <div>
                 <label class="required-label" for="parentChildAge">Starting level</label>
@@ -160,6 +160,7 @@
               </div>
               <button type="submit">Create child profile</button>
             </form>
+            <div class="parent-child-list" id="parentChildList"></div>
           </section>
 
           <section class="parent-question-manager hidden" id="parentQuestionManager" aria-label="Send a question">
@@ -197,6 +198,14 @@
                   <option value="elementary">Level 2 (ages 7-10)</option>
                   <option value="middle">Level 3 (ages 11-13)</option>
                   <option value="teen">Level 4 (ages 14+)</option>
+                </select>
+              </div>
+              <div>
+                <label for="parentQuestionComplexity">Complexity</label>
+                <select id="parentQuestionComplexity" name="parentQuestionComplexity">
+                  <option value="medium" selected>On level</option>
+                  <option value="easy">Support</option>
+                  <option value="hard">Challenge</option>
                 </select>
               </div>
               <div>
@@ -249,7 +258,10 @@
               <div class="question-draft-panel hidden" id="parentQuestionDraftPanel">
                 <strong id="parentQuestionDraftTitle">No questions added yet</strong>
                 <span id="parentQuestionDraftStatus">Build the set one question at a time. The test sends only after the selected number is ready.</span>
-                <button type="button" id="parentQuestionDraftClear">Clear draft</button>
+                <div class="question-draft-actions">
+                  <button type="button" id="parentQuestionRefresh">Refresh questions</button>
+                  <button type="button" id="parentQuestionDraftClear">Clear draft</button>
+                </div>
               </div>
               <button type="submit" id="parentQuestionSubmit">Send selected test</button>
             </form>
@@ -294,48 +306,60 @@
               </form>
             </div>
 
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Roster cleanup</p>
-                <h2>Delete profiles</h2>
+            <details class="dashboard-dropdown" open>
+              <summary>
+                <span>
+                  <small>Roster cleanup</small>
+                  <strong>Delete profiles</strong>
+                  <em>Remove parent or student accounts</em>
+                </span>
+              </summary>
+              <div class="roster-grid">
+                <details class="nested-dashboard-dropdown" open>
+                  <summary>Parents</summary>
+                  <div class="roster-list" id="parentRoster"></div>
+                </details>
+                <details class="nested-dashboard-dropdown" open>
+                  <summary>Students</summary>
+                  <div class="roster-list" id="childRoster"></div>
+                </details>
               </div>
-            </div>
-
-            <div class="roster-grid">
-              <section class="roster-card">
-                <h3>Parents</h3>
-                <div class="roster-list" id="parentRoster"></div>
-              </section>
-              <section class="roster-card">
-                <h3>Students</h3>
-                <div class="roster-list" id="childRoster"></div>
-              </section>
-            </div>
+            </details>
           </section>
 
           <section class="work-review hidden" id="workReview" aria-label="Student work review"></section>
 
-          <section class="ranking-section" aria-label="Level ranking">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Rankings</p>
-                <h2>Level leaderboard</h2>
-              </div>
-            </div>
+          <details class="ranking-section dashboard-dropdown" aria-label="Level ranking">
+            <summary>
+              <span>
+                <small>Rankings</small>
+                <strong>Level leaderboard</strong>
+                <em>Compare scores and completion time</em>
+              </span>
+            </summary>
             <div class="ranking-grid" id="rankingGrid"></div>
-          </section>
+          </details>
 
           <div class="report-grid" id="parentReport"></div>
         </section>
 
         <section class="practice-layout learner-only" id="practice">
+          <button class="student-test-alert hidden" id="studentTestAlert" type="button">
+            <span>Test waiting</span>
+            <strong id="studentTestAlertTitle">A new test is ready</strong>
+            <small id="studentTestAlertMeta">Open it from Tests / Practice</small>
+          </button>
+
           <article class="activity-card" aria-live="polite">
             <div class="card-heading">
               <div>
                 <p class="eyebrow">Practice round</p>
                 <h2 id="questionTitle">Solve the pattern</h2>
               </div>
-              <span class="level-chip" id="levelChip">Level 2</span>
+              <div class="activity-meta">
+                <span class="level-chip" id="levelChip">Level 2</span>
+                <span class="timer-chip" id="questionTimer">0s</span>
+              </div>
             </div>
 
             <div class="question-box">
@@ -349,6 +373,7 @@
                 <input id="answerInput" name="answer" autocomplete="off" />
                 <button type="submit">Check</button>
               </div>
+              <div class="choice-grid" id="choiceGrid" aria-label="Multiple choice answers"></div>
             </form>
 
             <p id="feedback" class="feedback" role="status">Try it when you're ready.</p>
@@ -364,6 +389,6 @@
     </div>
     <div class="celebration-layer" id="celebrationLayer" aria-hidden="true"></div>
 
-    <script src="./script.js"></script>
+    <script src="./brightpath-20260701.js?v=20260701-deploy-proof"></script>
   </body>
 </html>

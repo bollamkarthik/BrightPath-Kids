@@ -1,0 +1,6 @@
+{
+  "version": "20260701-deploy-proof",
+  "expectedScript": "brightpath-20260701.js",
+  "includesKidSessionFix": true,
+  "lookFor": "childSnapshot"
+}
